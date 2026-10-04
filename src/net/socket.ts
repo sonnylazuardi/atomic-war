@@ -10,6 +10,7 @@ const OFFSET_SAMPLES = 5;
 /** Estimates `serverClock - localClock` (ms). Pong samples (RTT-corrected) win over one-way hints. */
 export class ClockSync {
   private samples: number[] = [];
+  private rtts: number[] = [];
   private hint: number | null = null;
 
   /** a ping sent at local `sentAt` came back at local `recvAt` carrying the server's `serverNow` */
@@ -17,6 +18,13 @@ export class ClockSync {
     if (recvAt < sentAt) return;
     this.samples.push(serverNow - (sentAt + recvAt) / 2);
     if (this.samples.length > OFFSET_SAMPLES) this.samples.shift();
+    this.rtts.push(recvAt - sentAt);
+    if (this.rtts.length > OFFSET_SAMPLES) this.rtts.shift();
+  }
+
+  /** round-trip time (ms): median of the last few pongs; null before the first */
+  get rtt(): number | null {
+    return this.rtts.length ? median(this.rtts) : null;
   }
 
   /** a message stamped with serverNow arrived at local `recvAt` (one-way; used until a pong arrives) */

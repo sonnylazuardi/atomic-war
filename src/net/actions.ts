@@ -1,7 +1,7 @@
 // Online GameActions: every player intent becomes an `act` message; the clock-driven transitions
 // (newGame / readyForBattle / finishBattle / nextRound) belong to the server and are local hooks here.
 import type { GameActions } from '../core/types.ts';
-import type { ActName, ClientMsg } from './protocol.ts';
+import type { ActName } from './protocol.ts';
 
 export const ACT_NAMES = [
   'pickLord',
@@ -42,9 +42,10 @@ export interface ServerDrivenHooks {
   onBattleDone?: () => void;
 }
 
-export function makeOnlineActions(send: (m: ClientMsg) => void, hooks: ServerDrivenHooks = {}): GameActions {
+/** `dispatch` sends the intent (and may predict it, see predict.ts) */
+export function makeOnlineActions(dispatch: (name: ActName, args: unknown[]) => void, hooks: ServerDrivenHooks = {}): GameActions {
   const acts = {} as Record<ActName, (...args: unknown[]) => void>;
-  for (const name of ACT_NAMES) acts[name] = (...args: unknown[]) => send({ t: 'act', name, args: trimArgs(args) });
+  for (const name of ACT_NAMES) acts[name] = (...args: unknown[]) => dispatch(name, trimArgs(args));
   return {
     ...(acts as unknown as Pick<GameActions, ActName>),
     newGame: () => {},

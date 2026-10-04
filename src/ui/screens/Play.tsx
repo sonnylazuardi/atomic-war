@@ -21,7 +21,7 @@ import { World } from '../components/World.tsx';
 import { selfIdOf } from '../me.ts';
 import { useGame } from '../store.ts';
 import { GameOver } from './GameOver.tsx';
-import { useNet } from '../../net/session.ts';
+import { useNet, watch } from '../../net/session.ts';
 import { ONLINE_CSS } from './online/online.css.ts';
 
 /** Online: our replay ended but the server waits for every battle before moving to results. */
@@ -30,7 +30,7 @@ function OnlineWait() {
   const phase = useGame((s) => s.phase);
   if (!waiting || phase !== 'battle') return null;
   return (
-    <div className="ol-banner" data-testid="waiting-others">
+    <div className={`ol-banner${useNet.getState().watching !== null ? ' low' : ''}`} data-testid="waiting-others">
       <style>{ONLINE_CSS}</style>
       Waiting for other battles…
     </div>
@@ -66,6 +66,36 @@ function usePhaseTimer(): number | null {
   return left;
 }
 
+/** Online, eliminated: who we are watching (or how to start watching). */
+function SpectateBar() {
+  const watching = useNet((s) => (s.inGame ? s.watching : null));
+  const seat = useNet((s) => (s.inGame ? (s.you?.seat ?? null) : null));
+  const inGame = useNet((s) => s.inGame);
+  const name = useGame((s) => (watching !== null ? s.players[watching]?.name : undefined));
+  const dead = useGame((s) => seat !== null && s.players[seat]?.alive === false);
+  const phase = useGame((s) => s.phase);
+  if (!inGame || phase === 'game_over') return null;
+  if (watching !== null)
+    return (
+      <div className="spec-bar" data-testid="spectating">
+        <style>{ONLINE_CSS}</style>
+        Spectating {name ?? `Player ${watching + 1}`}
+        {seat !== null && (
+          <button className="btn btn-ghost" data-testid="spectate-back" onClick={() => watch(null)}>
+            Back
+          </button>
+        )}
+      </div>
+    );
+  if (!dead) return null;
+  return (
+    <div className="spec-bar hint">
+      <style>{ONLINE_CSS}</style>
+      You were eliminated · click a player on the left to watch
+    </div>
+  );
+}
+
 /** Mobile portrait: World shows the whole arena (letterboxed) instead of the desktop slice-fit.
  *  Passed via spread so it typechecks before and after World adds the props / MOBILE_VIEWBOX. */
 const MOBILE_WORLD = { viewBox: { x: 200, y: 70, w: 600, h: 520 }, fit: 'meet' as const };
@@ -89,6 +119,11 @@ export function Play() {
   const lordTargeting = useUi((s) => s.lordTargeting);
   const pending = useUi((s) => s.pending);
   const mobile = useLayoutMode() === 'mobile';
+  // online: spectating is read-only; an eliminated player has no shop
+  const spectating = useNet((s) => s.inGame && s.watching !== null);
+  const ownSeat = useNet((s) => (s.inGame ? (s.you?.seat ?? null) : null));
+  const ownDead = ownSeat !== null && players[ownSeat]?.alive === false;
+  const canShop = !spectating && !ownDead;
   const me = players[selfId]!;
   const prep = phase === 'prep';
   const battle = phase === 'battle';
@@ -239,14 +274,15 @@ export function Play() {
         <div className="m-world">{world}</div>
         <div className="m-scroll">
           <PlayerList opponent={oppId} />
-          <MobileBar />
-          <Dock shopOpen={shopOpen} onToggleShop={onToggleShop} />
+          {canShop && <MobileBar />}
+          {canShop && <Dock shopOpen={shopOpen} onToggleShop={onToggleShop} />}
           <UnitCard />
           <Roster />
-          <InventoryGrid />
+          {!spectating && <InventoryGrid />}
         </div>
-        <SellZone />
-        {prep && shopOpen && <MysteryShop mobile onClose={() => setShopOpen(false)} />}
+        {canShop && <SellZone />}
+        {canShop && prep && shopOpen && <MysteryShop mobile onClose={() => setShopOpen(false)} />}
+        <SpectateBar />
         {phase === 'results' && <ResultToast left={timer} />}
         {phase === 'game_over' && <GameOver />}
         <OnlineWait />
@@ -261,15 +297,18 @@ export function Play() {
         <TopCenter timer={timer} enemy={enemyName} />
         <PlayerList opponent={oppId} />
         <Roster />
-        <Dock shopOpen={shopOpen} onToggleShop={onToggleShop} />
+        {canShop && <Dock shopOpen={shopOpen} onToggleShop={onToggleShop} />}
         <div className="hud-unit-slot">
           <UnitCard />
         </div>
-        <div className="hud-br">
-          <InventoryGrid />
-        </div>
-        <SellZone />
-        {prep && shopOpen && <MysteryShop onClose={() => setShopOpen(false)} />}
+        {!spectating && (
+          <div className="hud-br">
+            <InventoryGrid />
+          </div>
+        )}
+        {canShop && <SellZone />}
+        {canShop && prep && shopOpen && <MysteryShop onClose={() => setShopOpen(false)} />}
+        <SpectateBar />
         {phase === 'results' && <ResultToast left={timer} />}
         {lordTargeting && prep && <div className="hud-banner">Choose a hero for your lord ability · Esc cancels</div>}
         <OnlineWait />

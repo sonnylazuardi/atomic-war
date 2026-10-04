@@ -9,7 +9,8 @@ import { api, loadSession, saveSession, type Session } from './api.ts';
 import { SERVER } from './config.ts';
 import { API_PREFIX } from './protocol.ts';
 import { makeOnlineActions } from './actions.ts';
-import type { BattleReplayInput, GameView, RoomInfo, ServerMsg } from './protocol.ts';
+import type { ActName, BattleReplayInput, GameView, RoomInfo, ServerMsg } from './protocol.ts';
+import { Predictor } from './predict.ts';
 import { GameSocket, type ConnStatus } from './socket.ts';
 
 export interface ChatLine {
@@ -28,6 +29,12 @@ interface NetState {
   /** our battle replay finished; the server moves everyone to results when all battles are done */
   waitingOthers: boolean;
   inGame: boolean;
+  /** round-trip ms (heartbeat ping/pong median) */
+  ping: number | null;
+  /** spectating: the seat whose arena we see (eliminated players); null = our own */
+  watching: number | null;
+  /** unrecoverable: the server speaks a newer protocol -> "Game updated — reload" */
+  fatal: 'version' | null;
 }
 
 export const useNet = create<NetState>()(() => ({
@@ -39,6 +46,9 @@ export const useNet = create<NetState>()(() => ({
   error: null,
   waitingOthers: false,
   inGame: false,
+  ping: null,
+  watching: null,
+  fatal: null,
 }));
 
 const setMode = (m: UiMode) => useMode.getState().setMode(m);
@@ -139,6 +149,17 @@ let socket: GameSocket | null = null;
 let offlineSnapshot: GameStore | null = null;
 let replay: { round: number; result: BattleResult; side: Team } | null = null;
 let lastPhaseKey = '';
+const predictor = new Predictor();
+
+/** our own seat (the store's selfId is the WATCHED seat while spectating) */
+export function ownSeat(): number {
+  return useNet.getState().you?.seat ?? useGame.getState().selfId ?? 0;
+}
+
+/** the store minus its action functions (reducers structuredClone their input) */
+export function plainState(s: object): GameState {
+  return Object.fromEntries(Object.entries(s).filter(([, v]) => typeof v !== 'function')) as unknown as GameState;
+}
 
 export function currentSocket(): GameSocket | null {
   return socket;
@@ -159,11 +180,18 @@ export function joinRoom(roomId: string, room: RoomInfo | null = null) {
   const sock = new GameSocket(s.token, roomId);
   socket = sock;
   sock.onStatus((conn) => socket === sock && useNet.setState({ conn }));
-  sock.on('welcome', (m) => useNet.setState({ you: m.you, room: m.room }));
+  sock.on('welcome', (m) => {
+    predictor.reset(); // a (re)connect: the fresh snapshot is the truth
+    useNet.setState({ you: m.you, room: m.room });
+  });
+  sock.on('pong', () => {
+    const rtt = sock.clock.rtt;
+    if (socket === sock && rtt !== null) useNet.setState({ ping: Math.round(rtt) });
+  });
   sock.on('room', (m) => useNet.setState({ room: m.room }));
   sock.on('chat', (m) => useNet.setState((st) => ({ chat: [...st.chat, { from: m.from, text: m.text, at: m.at }].slice(-60) })));
   sock.on('error', (m) => onError(m));
-  sock.on('state', (m) => applyView(m.state));
+  sock.on('state', (m) => applyView(m.state, m.ackSeq, m.watching ?? null));
   sock.on('battle', (m) => applyBattle(m.input));
   setMode('online-room');
   sock.connect();
@@ -171,7 +199,10 @@ export function joinRoom(roomId: string, room: RoomInfo | null = null) {
 
 function onError(m: Extract<ServerMsg, { t: 'error' }>) {
   useNet.setState({ error: m.message || m.code });
-  if (m.code === 'room_not_found' || m.code === 'room_full' || m.code === 'version') {
+  if (m.code === 'version') {
+    leaveRoom('online-rooms');
+    useNet.setState({ fatal: 'version', error: m.message || 'Game updated' });
+  } else if (m.code === 'room_not_found' || m.code === 'room_full') {
     leaveRoom('online-rooms');
     useNet.setState({ error: m.message || m.code });
   } else if (m.code === 'unauthorized') {
@@ -183,6 +214,11 @@ function onError(m: Extract<ServerMsg, { t: 'error' }>) {
 
 export function startMatch() {
   socket?.send({ t: 'start' });
+}
+
+/** spectate seat `pid` (eliminated players only); null = back to our own arena */
+export function watch(pid: number | null) {
+  socket?.send({ t: 'watch', pid });
 }
 
 export function sendChat(text: string) {
@@ -203,7 +239,7 @@ export function leaveRoom(next: UiMode | null = 'online-rooms') {
     closeSocket();
   }
   exitGame();
-  useNet.setState({ room: null, you: null, chat: [], conn: 'idle', waitingOthers: false });
+  useNet.setState({ room: null, you: null, chat: [], conn: 'idle', waitingOthers: false, ping: null, watching: null });
   if (next) setMode(next);
 }
 
@@ -212,7 +248,8 @@ function enterGame() {
   offlineSnapshot = useGame.getState();
   replay = null;
   lastPhaseKey = '';
-  const actions = makeOnlineActions((m) => socket?.send(m), {
+  predictor.reset();
+  const actions = makeOnlineActions(dispatch, {
     onBattleDone: () => useNet.setState({ waitingOthers: true }),
   });
   useGame.setState({ ...actions });
@@ -225,11 +262,27 @@ function exitGame() {
   if (offlineSnapshot) useGame.setState(offlineSnapshot, true);
   offlineSnapshot = null;
   replay = null;
-  useNet.setState({ inGame: false });
+  predictor.reset();
+  useNet.setState({ inGame: false, watching: null });
 }
 
-/** the local-only fields an incoming server view must not clobber */
-export function mergeView(prev: GameState, view: GameView, toLocal: (serverMs: number) => number, rep: typeof replay): Partial<GameState> {
+/** an intent: predicted locally when deterministic (predict.ts), always sent with its seq */
+function dispatch(name: ActName, args: unknown[]) {
+  if (!socket || useNet.getState().watching !== null) return; // spectating is read-only
+  const { seq, next } = predictor.act(plainState(useGame.getState()), ownSeat(), name, args);
+  socket.send({ t: 'act', name, args, seq });
+  if (next) useGame.setState(next as Partial<GameStore>);
+}
+
+/** the local-only fields an incoming server view must not clobber. While spectating, `selfId` (what the
+ *  HUD/World follow) becomes the watched seat; the real seat stays in useNet().you. */
+export function mergeView(
+  prev: GameState,
+  view: GameView,
+  toLocal: (serverMs: number) => number,
+  rep: typeof replay,
+  watching: number | null = null,
+): Partial<GameState> {
   let humanBattle = prev.humanBattle;
   let humanSide = prev.humanSide;
   if (view.phase === 'battle') {
@@ -243,14 +296,28 @@ export function mergeView(prev: GameState, view: GameView, toLocal: (serverMs: n
     phaseDeadline: view.phaseDeadline != null ? toLocal(view.phaseDeadline) : null,
     humanBattle,
     humanSide,
+    selfId: watching !== null && view.phase !== 'game_over' ? watching : view.selfId,
   };
 }
 
-function applyView(view: GameView) {
+function applyView(view: GameView, ackSeq: number | undefined, watching: number | null) {
   if (!socket) return;
   enterGame();
   const clock = socket.clock;
-  useGame.setState(mergeView(useGame.getState(), view, (ms) => clock.toLocal(ms), replay) as Partial<GameStore>);
+  if (watching !== useNet.getState().watching) {
+    replay = null; // a different arena: wait for its battle
+    useNet.setState({ watching });
+  }
+  const prev = useGame.getState();
+  const merged = mergeView(prev, view, (ms) => clock.toLocal(ms), replay, watching);
+  if (watching !== null) {
+    predictor.reset();
+    useGame.setState(merged as Partial<GameStore>);
+  } else {
+    // server state is the truth; still-unacknowledged predictions are re-applied on top
+    const base = { ...plainState(prev), ...merged } as GameState;
+    useGame.setState(predictor.reconcile(base, ownSeat(), ackSeq) as Partial<GameStore>);
+  }
   const key = `${view.phase}:${view.round}`;
   if (key !== lastPhaseKey) {
     lastPhaseKey = key;

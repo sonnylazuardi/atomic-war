@@ -1,4 +1,5 @@
 import { useSelfId } from '../../me.ts';
+import { useNet, watch } from '../../../net/session.ts';
 import { useGame } from '../../store.ts';
 import { lordDef } from '../defs.ts';
 import { LordTip, tip } from '../Tooltip.tsx';
@@ -7,7 +8,13 @@ import { LordTip, tip } from '../Tooltip.tsx';
 export function PlayerList({ opponent }: { opponent: number | null }) {
   const players = useGame((s) => s.players);
   const phase = useGame((s) => s.phase);
-  const selfId = useSelfId();
+  const viewId = useSelfId(); // the seat the HUD follows (the watched one while spectating)
+  const inGame = useNet((s) => s.inGame);
+  const seat = useNet((s) => (s.inGame ? (s.you?.seat ?? null) : null));
+  const watching = useNet((s) => s.watching);
+  const selfId = inGame && seat !== null ? seat : viewId;
+  // online: eliminated players (and seatless spectators) can watch anyone's arena
+  const canWatch = inGame && phase !== 'game_over' && (seat === null || players[seat]?.alive === false);
   const sorted = [...players].sort((a, b) => {
     if (a.alive !== b.alive) return a.alive ? -1 : 1;
     if (a.alive) return b.hp - a.hp || a.id - b.id;
@@ -22,9 +29,22 @@ export function PlayerList({ opponent }: { opponent: number | null }) {
         return (
           <div
             key={p.id}
-            className={`hp-row ${p.id === selfId ? 'you' : ''} ${p.alive ? '' : 'dead'} ${vs ? 'vs' : ''}`}
+            className={`hp-row ${p.id === selfId ? 'you' : ''} ${p.alive ? '' : 'dead'} ${vs ? 'vs' : ''}${canWatch ? ' watchable' : ''}${
+              watching === p.id ? ' watched' : ''
+            }`}
+            data-testid="player-row"
+            data-pid={p.id}
             {...(p.lordId ? tip(() => <LordTip id={p.lordId!} />) : {})}
+            {...(canWatch
+              ? {
+                  role: 'button',
+                  tabIndex: 0,
+                  title: p.id === seat ? 'Back to your arena' : `Watch ${p.name}`,
+                  onClick: () => watch(p.id === seat || p.id === watching ? null : p.id),
+                }
+              : {})}
           >
+            {canWatch && <span className="hp-watch">{watching === p.id ? 'Watching' : p.id === seat ? 'You' : 'Watch'}</span>}
             <div className="hp-port" style={{ ['--lord-c' as string]: lord?.color ?? '#666' }}>
               <span>{p.alive ? lord?.glyph ?? '?' : '💀'}</span>
               {vs && <i className="hp-vs">⚔</i>}

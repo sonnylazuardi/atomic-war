@@ -32,7 +32,7 @@ Game client: this repo (static SPA on Cloudflare Pages). Game server: `/home/son
    empty seat is filled with a bot running the current single-player bot AI, so it is always an 8-player
    game: 3 humans + 5 bots plays exactly like today's game, just with friends in some seats.
 9. **Who moves the clock?** The server, with the `phaseDeadline` contract already in `GameState`:
-   lord select 30 s (auto-pick the first offered lord) → prep 25 s → battle (longest battle replay + 4 s,
+   lord select 30 s (auto-pick the first offered lord) → prep 40 s → battle (longest battle replay + 4 s,
    capped 50 s) → results 4 s → prep … Clients count down to `phaseDeadline` using a server-time offset.
 10. **Disconnects?** The seat stays yours; while disconnected the bot AI plays it ("autopilot"). Reconnect
     with the same token + room id and you get your seat back and a fresh snapshot.
@@ -61,6 +61,13 @@ Game client: this repo (static SPA on Cloudflare Pages). Game server: `/home/son
 19. **Tests?** kickstart: room-engine unit tests (8 fake seats play to game over) + a WS integration test
     (real `Bun.serve` + `WebSocket` clients). game: multi-human core tests; smoke test with two browser
     contexts joining one room against a local kickstart.
+21. **Latency (players far from the server, e.g. UK ↔ SG)?** Optimistic UI: deterministic actions (buy,
+    place, equip, assign, sell, swap) apply locally at once with the same core reducer and are reconciled
+    with the server's snapshot (`act.seq` / `state.ackSeq`); only RNG actions (refresh) wait. WebSocket
+    `perMessageDeflate` shrinks snapshots; the connection badge shows ping. Deadlines already use server
+    time, battles replay locally.
+22. **Spectating?** Eliminated online players click anyone in the player list → `watch {pid}`; the server
+    streams that seat's view (`state.watching`) and battles; `watch {pid: null}` returns. Read-only.
 20. **Deploy?** kickstart: `fly deploy` (release command runs the migration). Game: `bun run deploy`.
 
 ## Endpoints (kickstart)

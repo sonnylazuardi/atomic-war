@@ -8,7 +8,7 @@ import { Play } from './screens/Play.tsx';
 import { useGame } from './store.ts';
 import { isOnlineMode, useMode } from './mode.ts';
 import { bootOnline } from '../net/session.ts';
-import { ConnBadge } from './screens/online/Shell.tsx';
+import { ConnBadge, UpdateOverlay } from './screens/online/Shell.tsx';
 import { Rooms } from './screens/online/Rooms.tsx';
 import { SignIn } from './screens/online/SignIn.tsx';
 import { Title } from './screens/online/Title.tsx';
@@ -149,6 +149,7 @@ export function App() {
     <>
       {body}
       {isOnlineMode(mode) && mode !== 'online-auth' && mode !== 'online-rooms' && <ConnBadge inGame={mode === 'online-game'} />}
+      {isOnlineMode(mode) && <UpdateOverlay />}
     </>
   );
 }

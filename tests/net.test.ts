@@ -3,7 +3,10 @@ import { describe, expect, test } from 'bun:test';
 import { makeOnlineActions, trimArgs, ACT_NAMES } from '../src/net/actions.ts';
 import { wsUrlFor } from '../src/net/config.ts';
 import { errorMessage } from '../src/net/api.ts';
-import type { ClientMsg, ServerMsg } from '../src/net/protocol.ts';
+import type { ClientMsg, GameView, ServerMsg } from '../src/net/protocol.ts';
+import { pingLevel, predictOne, Predictor } from '../src/net/predict.ts';
+import * as G from '../src/core/game/index.ts';
+import type { GameState } from '../src/core/types.ts';
 import { backoff, ClockSync, GameSocket, median, type WsLike } from '../src/net/socket.ts';
 import { initialMode } from '../src/ui/mode.ts';
 
@@ -90,12 +93,13 @@ describe('GameSocket', () => {
     s.send({ t: 'chat', text: 'hi' }); // queued until open
     expect(ws.sent).toEqual([]);
     ws.open();
-    expect(ws.sent[0]).toEqual({ t: 'hello', v: 1 });
+    expect(ws.sent[0]).toEqual({ t: 'hello', v: 2 });
     expect(ws.sent[1]).toEqual({ t: 'chat', text: 'hi' });
     expect(ws.sent[2]).toEqual({ t: 'ping', at: 1000 });
     now = 1100;
     ws.recv({ t: 'pong', at: 1000, serverNow: 51_050 });
     expect(s.clock.offset).toBe(50_000);
+    expect(s.clock.rtt).toBe(100);
     ws.recv({ t: 'room', room: { id: 'K7Q2' } as never });
     expect(got.length).toBe(1);
 
@@ -105,7 +109,7 @@ describe('GameSocket', () => {
     const ws2 = FakeWs.all[1]!;
     expect(ws2.url).toBe(ws.url);
     ws2.open();
-    expect(ws2.sent[0]).toEqual({ t: 'hello', v: 1 });
+    expect(ws2.sent[0]).toEqual({ t: 'hello', v: 2 });
     expect(s.status).toBe('online');
     expect(statuses).toEqual(['connecting', 'online', 'reconnecting', 'online']);
 
@@ -131,7 +135,7 @@ describe('online actions', () => {
   test('every intent becomes an act message with its args', () => {
     const sent: ClientMsg[] = [];
     let done = 0;
-    const a = makeOnlineActions((m) => sent.push(m), { onBattleDone: () => done++ });
+    const a = makeOnlineActions((name, args) => sent.push({ t: 'act', name, args }), { onBattleDone: () => done++ });
     a.pickLord('alchemist' as never);
     a.buyHero(2);
     a.assignSpell('h1', 1, 0);
@@ -228,5 +232,95 @@ describe('google login', async () => {
     expect(parseAuthHash('#aw_token=t0k')).toEqual({ token: 't0k', error: null });
     expect(parseAuthHash('#aw_error=access_denied')).toEqual({ token: null, error: 'access_denied' });
     expect(parseAuthHash('')).toEqual({ token: null, error: null });
+  });
+});
+
+// ---------------------------------------------------------------- optimistic UI
+
+/** an online prep-phase view for seat 2 (rngState 0, like the server sends) */
+function prepView(): GameState {
+  let s = G.newGame(11, { humans: [{ name: 'A' }, { name: 'B' }, { name: 'C' }] } as never);
+  s = G.autoPickLords(s);
+  s = { ...G.viewFor(s, 2) } as GameState;
+  return s;
+}
+
+describe('optimistic prediction', () => {
+  const base = prepView();
+  const pid = 2;
+
+  test('ping colour thresholds', () => {
+    expect([0, 119, 120, 249, 250, 900].map(pingLevel)).toEqual(['good', 'good', 'ok', 'ok', 'bad', 'bad']);
+  });
+
+  test('deterministic intents predict; RNG ones (refresh, hero buy with new uid) do not', () => {
+    expect(base.phase).toBe('prep');
+    expect(base.rngState).toBe(0);
+    expect(predictOne(base, pid, 'refreshShop', [])).toBeNull();
+    expect(predictOne(base, pid, 'rerollLords', [])).toBeNull();
+    expect(predictOne(base, pid, 'buyHero', [0])).toBeNull(); // the new hero's uid comes from the RNG
+    const lock = predictOne(base, pid, 'toggleLock', [])!;
+    expect(lock.players[pid]!.shop.locked).toBe(!base.players[pid]!.shop.locked);
+    expect(base.players[pid]!.shop.locked).toBe(false); // input untouched
+  });
+
+  test('predict, ack, re-apply pending on top of an older snapshot, rollback on rejection', () => {
+    const p = new Predictor();
+    const me = (s: GameState) => s.players[pid]!;
+    // seq 1: lock (predicted), seq 2: refresh (not predicted, just sent), seq 3: unlock again (predicted)
+    const a1 = p.act(base, pid, 'toggleLock', []);
+    expect(a1.seq).toBe(1);
+    expect(me(a1.next!).shop.locked).toBe(true);
+    const a2 = p.act(a1.next!, pid, 'refreshShop', []);
+    expect(a2.next).toBeNull();
+    const a3 = p.act(a1.next!, pid, 'toggleLock', []);
+    expect(me(a3.next!).shop.locked).toBe(false);
+    expect(p.pending.map((x) => x.seq)).toEqual([1, 3]);
+
+    // server applied seq 1 only: its state says locked; seq 3 re-applied on top -> unlocked (no flicker)
+    const server1 = G.toggleLock(base, pid);
+    const r1 = p.reconcile(server1, pid, 1);
+    expect(me(r1).shop.locked).toBe(false);
+    expect(p.pending.map((x) => x.seq)).toEqual([3]);
+
+    // server acks seq 3 as REJECTED (state unchanged = still locked): the prediction must not survive
+    const r2 = p.reconcile(server1, pid, 3);
+    expect(me(r2).shop.locked).toBe(true);
+    expect(p.pending).toEqual([]);
+  });
+
+  test('a prediction that no longer applies is dropped; an unacked one survives a broadcast', () => {
+    const p = new Predictor();
+    const coins = base.players[pid]!.coins;
+    p.act(base, pid, 'toggleLock', []);
+    // a phase broadcast (seq not yet applied) still shows our pending change
+    const r = p.reconcile({ ...base }, pid, 0);
+    expect(r.players[pid]!.shop.locked).toBe(true);
+    expect(r.players[pid]!.coins).toBe(coins);
+    // a server without ackSeq: trust it fully
+    expect(p.reconcile(base, pid, undefined).players[pid]!.shop.locked).toBe(false);
+    expect(p.pending).toEqual([]);
+  });
+
+  test('confirmed prediction equals the server state (no flicker on confirm)', () => {
+    const p = new Predictor();
+    const s0 = base;
+    const spellIdx = s0.players[pid]!.shop.spellOffers.findIndex((x) => x !== null);
+    const { next } = p.act(s0, pid, 'buySpell', [spellIdx]);
+    if (!next) return; // not affordable with this seed: nothing to compare
+    const server = G.buySpell(s0, pid, spellIdx);
+    const r = p.reconcile(server, pid, 1);
+    expect(r.players[pid]).toEqual(next.players[pid]!);
+  });
+});
+
+describe('spectating view merge', async () => {
+  const { mergeView } = await import('../src/net/session.ts');
+  test('selfId follows the watched seat until game over', () => {
+    const base = G.newGame(3);
+    const view = { ...base, phase: 'prep' as const, selfId: 1, phaseDeadline: null } as GameView;
+    expect(mergeView(base, view, (x) => x, null, 5).selfId).toBe(5);
+    expect(mergeView(base, view, (x) => x, null, null).selfId).toBe(1);
+    expect(mergeView(base, { ...view, phase: 'game_over' }, (x) => x, null, 5).selfId).toBe(1);
   });
 });

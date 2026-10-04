@@ -22,7 +22,7 @@ export const ITEM_SLOTS = 6; // Items tab of the hero roster
 export const MAX_SHOP_LEVEL = 6; // tavern
 export const HERO_OFFERS = 5; // real game shows 5 heroes in the Mystery shop
 /** seconds of preparation before auto-ready (UI timer). `?prep=0` disables it. */
-export const PREP_TIME = 25;
+export const PREP_TIME = 40;
 /** seconds the round result is shown before the next preparation starts */
 export const RESULTS_TIME = 4;
 

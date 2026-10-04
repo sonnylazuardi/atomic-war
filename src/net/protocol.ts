@@ -4,7 +4,7 @@
 
 import type { BattleTeamInput, GameActions, GameState, LordId, Team } from '../core/types.ts';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2; // v2: act.seq/ackSeq, watch (spectate), prep 40s
 export const MAX_SEATS = 8;
 export const WS_PATH = '/ws/atomic';
 export const API_PREFIX = '/api/atomic';
@@ -12,7 +12,7 @@ export const API_PREFIX = '/api/atomic';
 /** timings the server uses for its phase deadlines (seconds) */
 export const MP_TIMINGS = {
   lordSelect: 30,
-  prep: 25,
+  prep: 40,
   battleExtra: 4, // intro + outro on top of the longest battle replay
   battleMax: 50,
   results: 4,
@@ -91,14 +91,24 @@ export type ClientMsg =
   | { t: 'start' } // host only, lobby only
   | { t: 'leave' }
   | { t: 'chat'; text: string }
-  | { t: 'act'; name: ActName; args: unknown[] }
+  | { t: 'act'; name: ActName; args: unknown[]; seq?: number } // seq echoed back so optimistic UI can reconcile
+  /** spectate another player's arena (eliminated players only); null = back to your own seat */
+  | { t: 'watch'; pid: number | null }
   | { t: 'ping'; at: number };
 
 export type ServerMsg =
   | { t: 'welcome'; you: { userId: string; seat: number | null }; room: RoomInfo; serverNow: number }
   | { t: 'room'; room: RoomInfo }
-  | { t: 'state'; state: GameView; serverNow: number }
-  | { t: 'battle'; input: BattleReplayInput }
+  | {
+      t: 'state';
+      state: GameView;
+      serverNow: number;
+      /** highest act seq from this socket the server has applied (optimistic UI reconciliation) */
+      ackSeq?: number;
+      /** set while spectating: the seat whose arena this view shows (state.selfId stays YOUR seat) */
+      watching?: number | null;
+    }
+  | { t: 'battle'; input: BattleReplayInput; watching?: number | null }
   | { t: 'chat'; from: { userId: string; name: string }; text: string; at: number }
   | { t: 'error'; code: ErrorCode; message: string }
   | { t: 'pong'; at: number; serverNow: number };
