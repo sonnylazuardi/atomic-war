@@ -16,6 +16,8 @@ export const BATTLE_TIME_LIMIT = 45; // seconds
 
 export const MAX_HERO_LEVEL = 30;
 export const LEVELS_PER_UPGRADE = 4;
+/** a freshly recruited hero's level; each duplicate pick adds +4: 6, 10, 14, 18, 22, 26, 30 */
+export const START_HERO_LEVEL = 6;
 export const ITEM_SLOTS = 6; // Items tab of the hero roster
 export const MAX_SHOP_LEVEL = 6; // tavern
 export const HERO_OFFERS = 5; // real game shows 5 heroes in the Mystery shop

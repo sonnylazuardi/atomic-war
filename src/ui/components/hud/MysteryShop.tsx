@@ -1,7 +1,7 @@
 // Space: Mystery shop overlay — like the real game: a wide translucent 5-column panel.
 // Row 1 heroes (figures, no cards), row 2 items, row 3 spells; fewer than 5 offers are spread evenly.
 import type { CSSProperties } from 'react';
-import { HERO_COST } from '../../../core/constants.ts';
+import { HERO_COST, LEVELS_PER_UPGRADE, MAX_HERO_LEVEL } from '../../../core/constants.ts';
 import { refreshCostFor, spellCostFor } from '../../../core/game/lords.ts';
 import { useGame } from '../../store.ts';
 import { CLASS_INFO, heroDef, itemDef, spellDef, starColor } from '../defs.ts';
@@ -21,6 +21,7 @@ export function MysteryShop({ onClose, mobile = false }: { onClose: () => void; 
   const spellCost = safe(() => spellCostFor(me), 3);
   const refresh = safe(() => refreshCostFor(me), 1);
   const owned = new Set(me.heroes.map((h) => h.heroId));
+  const ownedLevel = new Map(me.heroes.map((h) => [h.heroId, h.level]));
   const { heroOffers, itemOffers, spellOffers } = me.shop;
 
   const heroCells = heroOffers.map((id, i) => {
@@ -39,7 +40,7 @@ export function MysteryShop({ onClose, mobile = false }: { onClose: () => void; 
         {...tip(() => (
           <>
             <HeroTip id={id} />
-            {dup && <div className="tip-foot gold">Owned — buying grants an upgrade</div>}
+            {dup && <div className="tip-foot gold">Owned — buying levels it up instantly (+{LEVELS_PER_UPGRADE} Lv)</div>}
           </>
         ))}
       >
@@ -48,7 +49,13 @@ export function MysteryShop({ onClose, mobile = false }: { onClose: () => void; 
           {d.name}
         </span>
         <span className="my-figure">
+          {dup && <span className="my-beam" aria-hidden />}
           <HeroPortrait heroId={id} phase={i * 0.7} />
+          {dup && (
+            <span className="my-uplv">
+              ⬆ Lv {ownedLevel.get(id)} → {Math.min(MAX_HERO_LEVEL, (ownedLevel.get(id) ?? 1) + LEVELS_PER_UPGRADE)}
+            </span>
+          )}
         </span>
         <span className="my-price">
           <Stars n={d.stars ?? 1} />

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   BENCH_SIZE,
   HERO_COST,
+  START_HERO_LEVEL,
   ITEM_SLOTS,
   SPELL_SLOTS,
   HERO_OFFERS,
@@ -103,7 +104,7 @@ describe('shop & economy', () => {
     expect(p.heroes.length).toBe(1);
     expect(p.shop.heroOffers[0]).toBeNull();
     const h = p.heroes[0]!;
-    expect(h.level).toBe(1);
+    expect(h.level).toBe(START_HERO_LEVEL);
     // a new hero comes with its real Dota kit [Q, W, E, R] + one free slot
     expect(h.spells).toEqual([...HERO_KITS.pudge, ...Array(SPELL_SLOTS - 4).fill(null)]);
     expect(h.spells.length).toBe(SPELL_SLOTS);
@@ -164,20 +165,20 @@ describe('shop & economy', () => {
     expect(s.players[0]!.coins).toBe(incomeForRound(1) + 2);
   });
 
-  test('duplicate -> pendingUpgrade -> level 5', () => {
+  test('buying a hero you own upgrades it immediately (+4 lv, no click needed)', () => {
     let s = withCoins(offer(offer(prepGame(1, 'axe_lord'), 'axe', 0), 'axe', 1), 10);
     s = G.buyHero(s, 0, 0);
     s = G.buyHero(s, 0, 1);
-    let p = s.players[0]!;
+    const p = s.players[0]!;
     expect(p.heroes.length).toBe(1);
-    expect(p.heroes[0]!.pendingUpgrades).toBe(1);
-    s = G.upgradeHero(s, 0, p.heroes[0]!.uid);
-    p = s.players[0]!;
-    expect(p.heroes[0]!.level).toBe(5);
+    expect(p.heroes[0]!.level).toBe(START_HERO_LEVEL + 4);
     expect(p.heroes[0]!.pendingUpgrades).toBe(0);
-    // no pending -> no-op
-    const again = G.upgradeHero(s, 0, p.heroes[0]!.uid);
-    expect(again.players[0]!.heroes[0]!.level).toBe(5);
+    expect(p.coins).toBe(10 - 2 * HERO_COST);
+    // a max-level hero can't be bought again (no coins wasted)
+    const maxed = structuredClone(offer(s, 'axe', 0));
+    maxed.players[0]!.heroes[0]!.level = 30;
+    const t = G.buyHero(maxed, 0, 0);
+    expect(t.players[0]!.coins).toBe(maxed.players[0]!.coins);
   });
 
   test('locked shop persists to next round, then unlocks', () => {
@@ -341,7 +342,7 @@ describe('roster', () => {
     s = G.buyHero(s, 0, 0);
     s = G.buyHero(s, 0, 1);
     s = G.upgradeHero(s, 0, heroOf(s).uid);
-    expect(heroOf(s).level).toBe(5);
+    expect(heroOf(s).level).toBe(START_HERO_LEVEL + 4);
     expect(heroOf(s).spells).toEqual([...HERO_KITS.axe, null]);
   });
 
@@ -359,7 +360,7 @@ describe('roster', () => {
     expect(t.players[0]!.heroes.length).toBe(boardCap(1));
     // ... but buying a duplicate still works (it becomes an upgrade)
     const d = G.buyHero(offer(s, 'axe'), 0, 0);
-    expect(d.players[0]!.heroes.find((h) => h.heroId === 'axe')!.pendingUpgrades).toBe(1);
+    expect(d.players[0]!.heroes.find((h) => h.heroId === 'axe')!.level).toBe(START_HERO_LEVEL + 4);
     // there is no bench to move a hero to
     const hero = p.heroes[0]!;
     const u = G.placeHero(s, 0, hero.uid, null);
@@ -401,10 +402,10 @@ describe('lords', () => {
     s = G.buyHero(s, 0, 0);
     const uid = s.players[0]!.heroes[0]!.uid;
     s = G.useLordAbility(s, 0, uid);
-    expect(s.players[0]!.heroes[0]!.level).toBe(13);
+    expect(s.players[0]!.heroes[0]!.level).toBe(START_HERO_LEVEL + 12);
     expect(s.players[0]!.heroes[0]!.spells.length).toBe(SPELL_SLOTS);
     s = G.useLordAbility(s, 0, uid);
-    expect(s.players[0]!.heroes[0]!.level).toBe(13);
+    expect(s.players[0]!.heroes[0]!.level).toBe(START_HERO_LEVEL + 12);
 
     let b = prepGame(1, 'bounty_hunter');
     const coins = b.players[0]!.coins;
