@@ -297,6 +297,7 @@ function WorldPrepDemo({ mobile = false }: { mobile?: boolean }) {
   const [heroes, setHeroes] = useState<OwnedHero[]>(PREP_START);
   const [sel, setSel] = useState<string | null>(null);
   const [terrain, setTerrain] = useState(0);
+  const [dragLog, setDragLog] = useState('');
   const place = (uid: string, slot: BoardSlot) =>
     setHeroes((hs) => {
       const me = hs.find((h) => h.uid === uid);
@@ -334,7 +335,9 @@ function WorldPrepDemo({ mobile = false }: { mobile?: boolean }) {
         <button type="button" onClick={() => setTerrain((t) => t + 1)}>
           Next terrain ({TERRAIN_IDS[terrain % TERRAIN_IDS.length]})
         </button>
-        <span>drag heroes between tiles · selected {sel ?? 'none'}</span>
+        <span>
+          drag heroes between tiles · selected {sel ?? 'none'} · <span data-testid="world-demo-draglog">{dragLog}</span>
+        </span>
       </div>
       <div
         className="gal-world"
@@ -355,6 +358,8 @@ function WorldPrepDemo({ mobile = false }: { mobile?: boolean }) {
           selectedUid={sel}
           onSelectHero={setSel}
           onPlaceHero={place}
+          onHeroDragStart={(uid) => setDragLog(`drag ${uid}`)}
+          onHeroDragEnd={(uid, x, y) => setDragLog(`end ${uid} @${Math.round(x)},${Math.round(y)}`)}
           onUpgradeHero={(uid) =>
             setHeroes((hs) =>
               hs.map((h) => (h.uid === uid && h.pendingUpgrades > 0 ? { ...h, level: Math.min(30, h.level + LEVELS_PER_UPGRADE), pendingUpgrades: h.pendingUpgrades - 1 } : h)),

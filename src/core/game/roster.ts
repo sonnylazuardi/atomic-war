@@ -1,5 +1,6 @@
 // Roster management: upgrade, sell, spells, items, placement.
-import { LEVELS_PER_UPGRADE, MAX_HERO_LEVEL, SELL_HERO, SELL_ITEM, SELL_SPELL, boardCap } from '../constants.ts';
+import { LEVELS_PER_UPGRADE, MAX_HERO_LEVEL, SELL_HERO, SELL_ITEM, SELL_SPELL, boardCap, itemSellValue } from '../constants.ts';
+import { ITEMS } from '../data/items.ts';
 import { addLevels } from './lords.ts';
 import { SPELLS } from '../data/spells.ts';
 import type { BoardSlot, OwnedHero, PlayerState, SpellId } from '../types.ts';
@@ -64,8 +65,8 @@ export function sellItemM(s: GS, pid: number, invIdx: number) {
   const p = prep(s, pid);
   if (!p) return;
   if (invIdx < 0 || invIdx >= p.itemInventory.length) return fail(s, p, 'No such item.');
-  p.itemInventory.splice(invIdx, 1);
-  p.coins += SELL_ITEM;
+  const [id] = p.itemInventory.splice(invIdx, 1);
+  p.coins += id ? itemSellValue(ITEMS[id]?.cost ?? 3) : SELL_ITEM;
 }
 
 export function assignSpellM(s: GS, pid: number, uid: string, slotIdx: number, invIdx: number) {

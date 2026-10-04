@@ -39,11 +39,15 @@ URLs: `/?seed=123` reproducible run · `/?gallery` every hero animation + every 
 - Each preparation the **Mystery shop** opens (Space toggles it): heroes, items and spells, each with a ★ rarity.
   Coins don't carry over between rounds.
 - **F** upgrades the Tavern: better ★ odds and one more item/spell offer per level. **V** uses your lord's ability.
-- Buy a hero you already own → a light beam shines on it in the arena; click it for +4 levels (max 30).
+- Heroes start at level 6. Picking a hero you already own (it glows in the shop) levels it up instantly:
+  6 → 10 → 14 → 18 → 22 → 26 → 30. Max 5 heroes; everything costs 3 and sells for 2.
 - Drag spells and items from the inventory onto a hero (roster on the right, or the hero in the arena).
   Spell order = cast priority; slot 1 is the hero's signature.
 - Drag heroes between formation tiles: your side is the bottom half, front row nearest the center.
-- **Enter** = Ready. You teleport to the enemy's arena (or they invade yours), fight, then return home.
+- Drag a hero, item or skill onto the trash at the bottom-left to sell it.
+- There is no Ready button: a fixed preparation timer starts every battle (same clock for everyone, ready
+  for multiplayer; `?prep=N` shortens it for testing). You teleport to the enemy's arena (or they invade
+  yours), fight, then return home.
   Losing costs HP; last summoner standing wins.
 
 ## Smoke test on WSL without sudo

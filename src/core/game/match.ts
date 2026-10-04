@@ -4,6 +4,7 @@ import {
   PLAYER_COUNT,
   PLAYER_START_HP,
   incomeForRound,
+  streakBonus,
   lossDamage,
 } from '../constants.ts';
 import { LORD_IDS } from '../ids.ts';
@@ -328,7 +329,7 @@ export function nextRoundM(s: GS) {
   s.humanBattle = null;
   for (const p of s.players) {
     if (!p.alive) continue;
-    p.coins = incomeForRound(s.round) + lordIncomeBonus(p);
+    p.coins = incomeForRound(s.round) + streakBonus(p.streak) + lordIncomeBonus(p);
     onRoundStart(p);
     if (p.shop.locked) p.shop.locked = false;
     else rollShop(s, p);

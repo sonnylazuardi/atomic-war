@@ -220,11 +220,15 @@ describe('tavern ★ odds', () => {
     TAVERN_ODDS[3]!.forEach((pct, i) => expect(Math.abs((counts[i]! / N) * 100 - pct)).toBeLessThan(3));
   });
 
-  test('tavern 1: no 4★+ items in 2000 rolls; tavern 6: some 6★ items', () => {
+  test('item level is gated by tavern level; tavern 6: some 6★ items', () => {
     const rng = createRng(7);
-    const low = new Set<number>();
-    for (let i = 0; i < 2000; i++) for (const id of G.rollItems(rng, 1, offersForShopLevel(1))) low.add(ITEMS[id].tier);
-    expect(Math.max(...low)).toBeLessThanOrEqual(3);
+    for (let lvl = 1; lvl <= 6; lvl++) {
+      const tiers = new Set<number>();
+      for (let i = 0; i < 1000; i++) for (const id of G.rollItems(rng, lvl, offersForShopLevel(lvl))) tiers.add(ITEMS[id].tier);
+      expect(Math.max(...tiers)).toBeLessThanOrEqual(lvl);
+    }
+    expect(ITEMS.black_king_bar.tier).toBe(5);
+    expect(ITEMS.aghanims_scepter.tier).toBe(4);
     let six = 0;
     for (let i = 0; i < 2000; i++) six += G.rollItems(rng, 6, offersForShopLevel(6)).filter((id) => ITEMS[id].tier === 6).length;
     expect(six).toBeGreaterThan(0);

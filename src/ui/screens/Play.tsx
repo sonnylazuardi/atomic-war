@@ -1,8 +1,9 @@
 // One persistent world (prep -> battle -> results) with the HUD overlaid. No screen swaps.
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { PREP_TIME, terrainForPlayer } from '../../core/constants.ts';
+import { terrainForPlayer } from '../../core/constants.ts';
 import type { BoardSlot } from '../../core/types.ts';
-import { currentDrag } from '../components/dnd.ts';
+import { currentDrag, useDragState } from '../components/dnd.ts';
+import { SellZone, sellPayload } from '../components/hud/SellZone.tsx';
 import { clickHero, dropOnHero, triggerLord } from '../components/hud/actions.ts';
 import { Dock } from '../components/hud/Dock.tsx';
 import { InventoryGrid } from '../components/hud/InventoryGrid.tsx';
@@ -20,37 +21,32 @@ import { World } from '../components/World.tsx';
 import { useGame } from '../store.ts';
 import { GameOver } from './GameOver.tsx';
 
-/** `?prep=0` disables the prep timer, `?prep=N` sets it to N seconds. */
-function prepSeconds(): number {
-  const v = new URLSearchParams(location.search).get('prep');
-  if (v === null || v === '') return PREP_TIME;
-  const n = Number(v);
-  return Number.isFinite(n) && n >= 0 ? n : PREP_TIME;
-}
+/** Deadline-driven phase clock (same for every player — multiplayer-ready). The store sets
+ *  state.phaseDeadline on every phase/round change; when it passes: prep -> battle, results -> next round. */
+let firedDeadline: number | null = null;
 
-function usePrepTimer(active: boolean, round: number): number | null {
-  const total = useMemo(prepSeconds, []);
+function usePhaseTimer(): number | null {
+  const deadline = useGame((s) => s.phaseDeadline ?? null);
   const [left, setLeft] = useState<number | null>(null);
   useEffect(() => {
-    if (!active || total <= 0) {
+    if (deadline == null) {
       setLeft(null);
       return;
     }
-    const end = performance.now() + total * 1000;
-    let fired = false;
     const tick = () => {
-      const l = Math.max(0, (end - performance.now()) / 1000);
-      setLeft(Math.ceil(l));
-      if (l <= 0 && !fired) {
-        fired = true;
-        const s = useGame.getState();
-        if (s.phase === 'prep' && s.round === round) s.readyForBattle();
-      }
+      const ms = deadline - Date.now();
+      setLeft(Math.max(0, Math.ceil(ms / 1000)));
+      if (ms > 0 || firedDeadline === deadline) return;
+      const s = useGame.getState();
+      if (s.phaseDeadline !== deadline) return;
+      firedDeadline = deadline; // once per deadline, even across remounts
+      if (s.phase === 'prep') s.readyForBattle();
+      else if (s.phase === 'results') s.nextRound();
     };
     tick();
     const h = setInterval(tick, 250);
     return () => clearInterval(h);
-  }, [active, round, total]);
+  }, [deadline]);
   return left;
 }
 
@@ -71,7 +67,6 @@ export function Play() {
   const pairings = useGame((s) => s.pairings);
   const humanBattle = useGame((s) => s.humanBattle);
   const humanSide = useGame((s) => s.humanSide);
-  const readyForBattle = useGame((s) => s.readyForBattle);
   const placeHero = useGame((s) => s.placeHero);
   const selectedUid = useUi((s) => s.selectedUid);
   const lordTargeting = useUi((s) => s.lordTargeting);
@@ -95,7 +90,7 @@ export function Play() {
     }
   }, [prep]);
 
-  const timer = usePrepTimer(prep, round);
+  const timer = usePhaseTimer();
 
   const pairing = pairings.find((p) => p.left === 0 || p.right === 0) ?? null;
   const oppId = pairing ? (pairing.left === 0 ? pairing.right : pairing.left) : null;
@@ -116,6 +111,17 @@ export function Play() {
     if (s.phase === 'prep') s.upgradeHero(uid);
   }, []);
   const onSelectHero = useCallback((uid: string | null) => clickHero(uid), []);
+  // World pointer-drag of a hero sprite: show the sell zone; releasing over it sells the hero
+  const onHeroDragStart = useCallback((uid: string) => {
+    if (useGame.getState().phase === 'prep') useDragState.setState({ worldHeroUid: uid });
+  }, []);
+  const onHeroDragEnd = useCallback((uid: string, clientX: number, clientY: number) => {
+    const zone = document.querySelector('[data-testid="sell-zone"]');
+    useDragState.setState({ worldHeroUid: null });
+    if (!zone) return;
+    const r = zone.getBoundingClientRect();
+    if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) sellPayload({ kind: 'hero', uid });
+  }, []);
   const onPlaceHero = useCallback((uid: string, slot: BoardSlot) => {
     if (useGame.getState().phase === 'prep') useGame.getState().placeHero(uid, slot);
   }, []);
@@ -135,25 +141,17 @@ export function Play() {
     [placeHero],
   );
 
-  // hotkeys: Space Mystery · F Tavern · V lord · R refresh · Enter ready · Esc close
+  // hotkeys: Space Mystery · F Tavern · V lord · R refresh · Esc close (no Ready: the phase timer starts battles)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
       const s = useGame.getState();
       const isSpace = e.code === 'Space' || e.key === ' ';
-      const isEnter = e.key === 'Enter';
-      if (s.phase === 'results') {
-        if (isEnter || isSpace) {
-          e.preventDefault();
-          if (!e.repeat) s.nextRound();
-        }
-        return;
-      }
       if (s.phase !== 'prep') {
-        if (isSpace || isEnter) e.preventDefault();
+        if (isSpace) e.preventDefault();
         return;
       }
-      if (e.repeat && (isSpace || isEnter || e.code === 'KeyF' || e.code === 'KeyV')) {
+      if (e.repeat && (isSpace || e.code === 'KeyF' || e.code === 'KeyV')) {
         e.preventDefault();
         return;
       }
@@ -161,9 +159,6 @@ export function Play() {
         e.preventDefault();
         hideTip();
         setShopOpen((o) => !o);
-      } else if (isEnter) {
-        e.preventDefault();
-        s.readyForBattle();
       } else if (e.code === 'KeyF') {
         e.preventDefault();
         s.upgradeShop();
@@ -214,7 +209,7 @@ export function Play() {
       onDropOnHero={onDropOnHero}
       onDropOnSlot={onDropOnSlot}
       onBattleDone={onBattleDone}
-      {...{ onUpgradeHero }}
+      {...{ onUpgradeHero, onHeroDragStart, onHeroDragEnd }}
       {...(mobile ? MOBILE_WORLD : {})}
     />
   );
@@ -223,7 +218,7 @@ export function Play() {
   if (mobile) {
     return (
       <div className={`screen mplay phase-${phase} ${lordTargeting ? 'lord-targeting' : ''} ${pending ? 'assigning' : ''}`}>
-        <TopCenter timer={timer} enemy={enemyName} onReady={prep ? () => readyForBattle() : null} />
+        <TopCenter timer={timer} enemy={enemyName} />
         <div className="m-world">{world}</div>
         <div className="m-scroll">
           <PlayerList opponent={oppId} />
@@ -233,8 +228,9 @@ export function Play() {
           <Roster />
           <InventoryGrid />
         </div>
+        <SellZone />
         {prep && shopOpen && <MysteryShop mobile onClose={() => setShopOpen(false)} />}
-        {phase === 'results' && <ResultToast />}
+        {phase === 'results' && <ResultToast left={timer} />}
         {phase === 'game_over' && <GameOver />}
       </div>
     );
@@ -244,7 +240,7 @@ export function Play() {
     <div className={`screen play phase-${phase} ${lordTargeting ? 'lord-targeting' : ''} ${pending ? 'assigning' : ''}`}>
       <div className="play-world">{world}</div>
       <div className="hud">
-        <TopCenter timer={timer} enemy={enemyName} onReady={prep ? () => readyForBattle() : null} />
+        <TopCenter timer={timer} enemy={enemyName} />
         <PlayerList opponent={oppId} />
         <Roster />
         <Dock shopOpen={shopOpen} onToggleShop={onToggleShop} />
@@ -254,8 +250,9 @@ export function Play() {
         <div className="hud-br">
           <InventoryGrid />
         </div>
+        <SellZone />
         {prep && shopOpen && <MysteryShop onClose={() => setShopOpen(false)} />}
-        {phase === 'results' && <ResultToast />}
+        {phase === 'results' && <ResultToast left={timer} />}
         {lordTargeting && prep && <div className="hud-banner">Choose a hero for your lord ability · Esc cancels</div>}
       </div>
       {phase === 'game_over' && <GameOver />}

@@ -123,7 +123,7 @@ describe('items', () => {
       expect(Number.isInteger(it.tier)).toBe(true);
       expect(it.tier).toBeGreaterThanOrEqual(1);
       expect(it.tier).toBeLessThanOrEqual(6);
-      expect(it.cost).toBe(it.tier >= 5 ? it.tier : 3);
+      expect(it.cost).toBe(3); // everything in the Mystery shop costs 3 (sells for 2)
       expect(it.description.length).toBeGreaterThan(0);
       if (it.active?.when === 'cooldown') expect(pos(it.active.cooldown ?? 0)).toBe(true);
     }

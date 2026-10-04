@@ -72,7 +72,9 @@ function rollByStars<T extends string>(
   const buckets = new Map<number, T[]>();
   for (const id of pool) {
     if (exclude.includes(id)) continue;
-    const st = Math.min(maxStar, Math.max(1, starOf(id)));
+    const raw = Math.max(1, starOf(id));
+    if (raw > maxStar) continue; // above the cap (items: above the tavern level) -> never offered
+    const st = raw;
     const b = buckets.get(st);
     if (b) b.push(id);
     else buckets.set(st, [id]);
@@ -96,15 +98,16 @@ function rollByStars<T extends string>(
 const SHOP_ITEMS: ItemId[] = ITEM_IDS.filter((id) => ITEMS[id] && !ITEMS[id].lordOnly);
 
 export function rollItems(rng: Rng, shopLevel: number, n: number, exclude: readonly (ItemId | null)[] = []): ItemId[] {
-  return rollByStars(rng, shopLevel, n, SHOP_ITEMS, (id) => ITEMS[id]?.tier ?? 1, 6, exclude);
+  // item level gate: nothing above the tavern level can ever appear
+  return rollByStars(rng, shopLevel, n, SHOP_ITEMS, (id) => ITEMS[id]?.tier ?? 1, Math.min(6, clampLevel(shopLevel)), exclude);
 }
 
 export function rollSpells(rng: Rng, shopLevel: number, n: number, exclude: readonly (SpellId | null)[] = []): SpellId[] {
-  return rollByStars(rng, shopLevel, n, SPELL_IDS as readonly SpellId[], (id) => SPELLS[id]?.stars ?? 1, 5, exclude);
+  return rollByStars(rng, clampLevel(shopLevel + 1), n, SPELL_IDS as readonly SpellId[], (id) => SPELLS[id]?.stars ?? 1, 5, exclude);
 }
 
 export function rollHeroes(rng: Rng, shopLevel: number, n: number, exclude: readonly (HeroId | null)[] = []): HeroId[] {
-  return rollByStars(rng, shopLevel, n, HERO_IDS as readonly HeroId[], (id) => HEROES[id]?.stars ?? 1, 5, exclude);
+  return rollByStars(rng, clampLevel(shopLevel + 1), n, HERO_IDS as readonly HeroId[], (id) => HEROES[id]?.stars ?? 1, 5, exclude);
 }
 
 /** Fully re-roll a player's shop (ignores lock). Mutates. */

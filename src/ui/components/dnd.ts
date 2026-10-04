@@ -1,8 +1,10 @@
 // Tiny HTML5 drag-and-drop helper. The payload lives in a module variable because
 // dataTransfer contents are not readable during dragover.
 import { useRef, useState, type DragEvent } from 'react';
+import { create } from 'zustand';
 import { isTouch } from './hud/layout.ts';
 import { hideTip } from './Tooltip.tsx';
+import { useUi } from './uiState.ts';
 
 export type DragPayload =
   | { kind: 'hero'; uid: string }
@@ -13,8 +15,15 @@ export type DragPayload =
 
 let current: DragPayload | null = null;
 
+/** Reactive mirror of the active drag (the sell zone shows while something sellable is dragged). */
+export const useDragState = create<{ payload: DragPayload | null; worldHeroUid: string | null }>()(() => ({
+  payload: null,
+  worldHeroUid: null,
+}));
+
 function endDrag() {
   current = null;
+  if (useDragState.getState().payload) useDragState.setState({ payload: null });
   document.body.className = document.body.className
     .split(' ')
     .filter((c) => c !== 'dragging' && !c.startsWith('drag-'))
@@ -35,6 +44,14 @@ export function dragProps(p: DragPayload | null) {
       e.stopPropagation();
       current = p;
       hideTip();
+      // defer: changing the DOM inside dragstart can cancel the drag in Chromium
+      setTimeout(() => {
+        if (current !== p) return;
+        // show the roster tab whose slots accept what is being dragged
+        if (p.kind === 'spellInv' || p.kind === 'spellSlot') useUi.setState({ rosterTab: 'skills' });
+        else if (p.kind === 'itemInv' || p.kind === 'itemSlot') useUi.setState({ rosterTab: 'items' });
+        useDragState.setState({ payload: p });
+      }, 0);
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', p.kind);
       document.body.classList.add('dragging', `drag-${p.kind}`);

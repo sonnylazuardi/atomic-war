@@ -49,27 +49,28 @@ async function clickAll(page: Page, testId: string, max: number) {
   return n;
 }
 
-/** results toast may auto-continue; click Continue if it's still there */
+// No Ready button: rounds start when the fixed preparation timer runs out (?prep=N shortens it for tests)
+// and results auto-advance, exactly like multiplayer will.
+const PREP = 5;
+
+/** after a battle: wait for the next preparation (shop auto-opens) or game over */
 async function passResults(page: Page) {
-  const next = page.getByTestId('ready').or(page.getByTestId('continue')).or(page.getByTestId('game-over'));
-  await next.first().waitFor({ timeout: 20000 });
-  const cont = page.getByTestId('continue');
-  if ((await cont.count()) > 0) await cont.first().click({ timeout: 2000 }).catch(() => {});
+  const next = page.getByTestId('shop-hero-offer').or(page.getByTestId('game-over'));
+  await next.first().waitFor({ timeout: 30000 });
 }
 
 async function playRound(page: Page, round: number) {
-  await page.getByTestId('ready').waitFor({ timeout: 15000 });
   // the Mystery shop opens on its own at the start of every preparation phase
-  await page.getByTestId('shop-hero-offer').first().waitFor({ timeout: 5000 });
+  await page.getByTestId('shop-hero-offer').first().waitFor({ timeout: 15000 });
+  await page.getByTestId('phase-timer').first().waitFor({ timeout: 5000 });
   await shot(page, `r${round}-shop`);
   await clickAll(page, 'shop-hero-offer', 3);
   await clickAll(page, 'shop-spell-offer', 1);
   await page.keyboard.press('Escape');
   if (round === 2) await page.keyboard.press('KeyF'); // upgrade tavern
   await shot(page, `r${round}-prep`);
-  await page.getByTestId('ready').click();
-  step(`round ${round}: battle started`);
-  await page.getByTestId('battle-skip').waitFor({ timeout: 10000 });
+  await page.getByTestId('battle-skip').waitFor({ timeout: (PREP + 15) * 1000 }); // timer starts the battle
+  step(`round ${round}: battle started by the timer`);
   await page.waitForTimeout(800);
   await shot(page, `r${round}-teleport`);
   await page.waitForTimeout(2200); // watch the fight a bit
@@ -77,8 +78,9 @@ async function playRound(page: Page, round: number) {
   await page.getByTestId('battle-skip').click();
   await page.waitForTimeout(600);
   await shot(page, `r${round}-outro`);
+  await page.getByTestId('results').or(page.getByTestId('game-over')).first().waitFor({ timeout: 15000 });
+  await shot(page, `r${round}-results`);
   await passResults(page);
-  await shot(page, `r${round}-after`);
   step(`round ${round}: done`);
 }
 
@@ -95,7 +97,7 @@ try {
   page.on('console', (m) => m.type() === 'error' && errors.push(`console: ${m.text()}`));
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 
-  await page.goto(`${BASE}/?seed=42&prep=0`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE}/?seed=42&prep=${PREP}`, { waitUntil: 'domcontentloaded' });
   await page.getByTestId('lord-option').first().waitFor({ timeout: 15000 });
   await shot(page, 'lord-select');
   await page.getByTestId('lord-option').first().click();
@@ -108,8 +110,7 @@ try {
   // keep going without shopping until the game ends (human eventually loses) -> GameOver screen
   let rounds = 2;
   while ((await page.getByTestId('game-over').count()) === 0 && rounds < 60) {
-    await page.getByTestId('ready').click({ timeout: 15000 });
-    await page.getByTestId('battle-skip').click({ timeout: 10000 });
+    await page.getByTestId('battle-skip').click({ timeout: (PREP + 15) * 1000 });
     await passResults(page);
     rounds++;
   }
@@ -131,7 +132,7 @@ try {
   const m = await phone.newPage();
   m.on('console', (msg) => msg.type() === 'error' && errors.push(`mobile console: ${msg.text()}`));
   m.on('pageerror', (e) => errors.push(`mobile pageerror: ${e.message}`));
-  await m.goto(`${BASE}/?seed=7&prep=0`, { waitUntil: 'domcontentloaded' });
+  await m.goto(`${BASE}/?seed=7&prep=${PREP}`, { waitUntil: 'domcontentloaded' });
   await m.getByTestId('lord-option').first().waitFor({ timeout: 15000 });
   await shot(m, 'mobile-lord-select');
   await m.getByTestId('lord-option').first().tap();
@@ -141,8 +142,7 @@ try {
   for (let i = 0; i < 2; i++) await m.getByTestId('shop-hero-offer').first().tap({ timeout: 2000 }).catch(() => {});
   await m.getByTestId('close-shop').first().tap({ timeout: 2000 }).catch(() => {});
   await shot(m, 'mobile-prep');
-  await m.getByTestId('ready').first().tap();
-  await m.getByTestId('battle-skip').waitFor({ timeout: 10000 });
+  await m.getByTestId('battle-skip').waitFor({ timeout: (PREP + 15) * 1000 }); // timer starts it
   await m.waitForTimeout(2500);
   await shot(m, 'mobile-battle');
   await m.getByTestId('battle-skip').tap();

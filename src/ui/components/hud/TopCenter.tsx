@@ -2,7 +2,7 @@ import { boardCap } from '../../../core/constants.ts';
 import { boardCount } from '../../../core/game/index.ts';
 import { useGame } from '../../store.ts';
 
-export function TopCenter({ timer, enemy, onReady }: { timer: number | null; enemy: string | null; onReady: (() => void) | null }) {
+export function TopCenter({ timer, enemy }: { timer: number | null; enemy: string | null }) {
   const round = useGame((s) => s.round);
   const phase = useGame((s) => s.phase);
   const me = useGame((s) => s.players[0]!);
@@ -10,7 +10,7 @@ export function TopCenter({ timer, enemy, onReady }: { timer: number | null; ene
   const n = boardCount(me);
   const label = phase === 'battle' ? 'Battle' : phase === 'prep' ? 'Preparation' : phase === 'game_over' ? 'Game Over' : 'Results';
   const cls = phase === 'battle' ? 'battle' : phase === 'prep' ? 'prep' : 'over';
-  const urgent = timer !== null && timer <= 10;
+  const urgent = phase === 'prep' && timer !== null && timer <= 5;
   return (
     <div className="hud-top">
       <div className="ht-emblem" aria-hidden>
@@ -26,9 +26,13 @@ export function TopCenter({ timer, enemy, onReady }: { timer: number | null; ene
         <div className="ht-title">
           Round <b data-testid="round">{round}</b> <span className={`ht-phase ${cls}`}>{label}</span>
         </div>
-        <div className={`ht-sub ${urgent ? 'urgent' : ''}`}>
-          {phase === 'prep' ? (timer !== null ? timer : '∞') : phase === 'battle' && enemy ? `vs ${enemy}` : '—'}
-        </div>
+        {timer !== null && phase !== 'battle' ? (
+          <div className={`ht-sub ht-timer ${urgent ? 'urgent' : ''}`} data-testid="phase-timer">
+            {timer}
+          </div>
+        ) : (
+          <div className="ht-sub">{phase === 'battle' && enemy ? `vs ${enemy}` : '—'}</div>
+        )}
       </div>
       <div className={`ht-stat ${n >= cap ? 'full' : ''}`} title="Heroes on board / cap">
         <span className="ht-ico">👤</span>
@@ -38,11 +42,6 @@ export function TopCenter({ timer, enemy, onReady }: { timer: number | null; ene
         <span className="ht-coin">$</span>
         <b data-testid="coins">{me.coins}</b>
       </div>
-      {onReady && (
-        <button className="hud-ready" data-testid="ready" onClick={onReady} title="Ready for battle (Enter)">
-          Ready <kbd>Enter</kbd>
-        </button>
-      )}
     </div>
   );
 }

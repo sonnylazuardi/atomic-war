@@ -23,31 +23,43 @@ export const MAX_SHOP_LEVEL = 6; // tavern
 export const HERO_OFFERS = 5; // real game shows 5 heroes in the Mystery shop
 /** seconds of preparation before auto-ready (UI timer). `?prep=0` disables it. */
 export const PREP_TIME = 45;
+/** seconds the round result is shown before the next preparation starts */
+export const RESULTS_TIME = 4;
 
 /** Tavern level (1..6) -> % chance of each star 1★..6★ for every Mystery-shop offer. Rows sum to 100.
- *  Heroes/spells top out at 5★ (a 6★ roll becomes 5★). Level 4 matches the real game tooltip. */
+ *  ITEM LEVEL IS GATED BY THE TAVERN: an item's ★ (its level) never exceeds the tavern level — e.g. Black
+ *  King Bar (5★) needs tavern 5, Aghanim's Scepter (4★) tavern 4. Level 5 matches the real game tooltip
+ *  (13/25/36/18/8/0). Heroes and spells roll one tavern level ahead (they cap at 5★). */
 export const TAVERN_ODDS: readonly (readonly number[])[] = [
-  [70, 25, 5, 0, 0, 0],
-  [45, 35, 17, 3, 0, 0],
-  [25, 35, 28, 10, 2, 0],
+  [100, 0, 0, 0, 0, 0],
+  [65, 35, 0, 0, 0, 0],
+  [40, 38, 22, 0, 0, 0],
+  [25, 33, 28, 14, 0, 0],
   [13, 25, 36, 18, 8, 0],
-  [8, 15, 30, 27, 15, 5],
-  [5, 10, 20, 30, 23, 12],
+  [8, 17, 30, 25, 13, 7],
 ];
 
 export const HERO_COST = 3;
 export const SPELL_COST = 3;
 export const REFRESH_COST = 1;
 export const SELL_HERO = 2;
-export const SELL_SPELL = 1;
-export const SELL_ITEM = 1;
+export const SELL_SPELL = 2; // buy 3 -> sell 2, same as heroes
+export const SELL_ITEM = 2; // for a 3-coin item; pricier items sell for cost - 1 (itemSellValue)
+export const itemSellValue = (cost: number) => Math.max(1, cost - 1);
 export const LORD_CHOICES = 4; // "Choose Your Summoner" shows 4
 
-export const incomeForRound = (round: number) => 5 + Math.min(round, 5);
+/** Coins each preparation (they do NOT carry over): 4 + round, capped at 15 -> 5, 6, 7 ... 15 by round 11.
+ *  Paced against the tavern prices (4/6/8/9/12): each step is affordable about when it matters, but always
+ *  competes with buying units that round. */
+export const incomeForRound = (round: number) => Math.min(15, 4 + round);
+/** win/loss streak bonus: +1 coin at a 3-round streak, +2 at 5+ (comeback for losers, reward for winners) */
+export const streakBonus = (streak: number) => (Math.abs(streak) >= 5 ? 2 : Math.abs(streak) >= 3 ? 1 : 0);
 /** max heroes in the arena — fixed at 5 (the real game's limit); buying is otherwise only limited by gold */
 export const MAX_HEROES = 5;
 export const boardCap = (_round: number) => MAX_HEROES;
-export const shopUpgradeCost = (level: number) => 2 + 2 * level;
+/** tavern upgrade price from the current level: 1->2 costs 4, 2->3 6, 3->4 8, 4->5 9, 5->6 12 (6 = max) */
+const TAVERN_UPGRADE_COSTS = [4, 6, 8, 9, 12];
+export const shopUpgradeCost = (level: number) => TAVERN_UPGRADE_COSTS[Math.max(1, level) - 1] ?? 12;
 /** offers of spells and items each — one more per tavern level: 2, 3, 4, 5, 5, 5 */
 export const offersForShopLevel = (level: number) => Math.min(5, 1 + level);
 /** max item tier that can appear at a tavern level (derived from TAVERN_ODDS) */

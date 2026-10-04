@@ -342,6 +342,13 @@ export interface GameState {
   humanBattle: BattleResult | null; // full recording of the human's battle, for the arena
   humanSide: Team; // which side the human is on in humanBattle
   log: string[]; // short human-readable messages, newest last
+  /**
+   * Wall-clock deadline (epoch ms) when the current phase auto-advances: prep -> battle at the end of the
+   * preparation timer, results -> next prep. There is no Ready button: like the real game (and future
+   * multiplayer, where a server sets one deadline for all 8 players) the clock alone moves the game on.
+   * Set by the store (the clock authority), never by the pure core reducers. null = no timer.
+   */
+  phaseDeadline?: number | null;
 }
 
 // ---------------------------------------------------------------- battle sim I/O

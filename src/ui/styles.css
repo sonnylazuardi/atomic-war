@@ -2660,3 +2660,145 @@ body {
   font-size: 9px;
   line-height: 11px;
 }
+
+/* ============================================================ phase timer (no Ready button) */
+.ht-timer {
+  display: block;
+  width: fit-content;
+  margin: 0 auto;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(255, 207, 90, 0.35);
+}
+.ht-timer.urgent {
+  color: var(--dire);
+  text-shadow: 0 0 12px rgba(229, 72, 77, 0.7);
+  animation: timer-pulse 0.5s ease-in-out infinite alternate;
+}
+@keyframes timer-pulse {
+  to {
+    transform: scale(1.18);
+  }
+}
+.mplay .ht-timer {
+  font-size: 20px;
+  margin: 0;
+}
+.rt-next {
+  position: relative;
+  margin-top: 4px;
+  padding-bottom: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.rt-next b {
+  color: var(--gold);
+}
+.rt-next .rt-timer {
+  background: var(--gold);
+  opacity: 0.6;
+  border-radius: 2px;
+}
+
+/* ============================================================ sell / trash zone */
+.sell-zone {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  width: 314px;
+  height: 116px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 18px;
+  border-radius: 8px;
+  border: 2px dashed rgba(255, 160, 60, 0.7);
+  background: linear-gradient(180deg, rgba(60, 30, 6, 0.92), rgba(30, 14, 4, 0.94));
+  box-shadow: 0 0 24px rgba(255, 140, 40, 0.35);
+  color: #ff9f2e;
+  animation: sz-in 0.15s ease-out both;
+}
+@keyframes sz-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+.sell-zone.over {
+  border-style: solid;
+  border-color: #ffc06a;
+  background: linear-gradient(180deg, rgba(110, 54, 8, 0.95), rgba(60, 26, 4, 0.96));
+  box-shadow: 0 0 36px rgba(255, 160, 60, 0.7);
+}
+.sell-zone.destroy {
+  color: #ff6b6b;
+  border-color: rgba(229, 72, 77, 0.75);
+  background: linear-gradient(180deg, rgba(70, 12, 14, 0.92), rgba(34, 6, 8, 0.94));
+}
+.sz-can {
+  position: relative;
+  width: 56px;
+  height: 70px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+.sz-can svg {
+  width: 46px;
+  height: 50px;
+  filter: drop-shadow(0 0 8px currentColor);
+}
+.sell-zone.over .sz-can svg {
+  transform: scale(1.1);
+}
+.sz-arrow {
+  position: absolute;
+  top: -4px;
+  font-size: 18px;
+  animation: sz-arrow 0.8s ease-in-out infinite;
+}
+@keyframes sz-arrow {
+  50% {
+    transform: translateY(7px);
+    opacity: 0.6;
+  }
+}
+.sz-text {
+  pointer-events: none;
+  min-width: 0;
+}
+.sz-value {
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: 30px;
+  line-height: 1;
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(255, 207, 90, 0.5);
+}
+.sell-zone.destroy .sz-value {
+  color: #ff6b6b;
+  text-shadow: 0 0 12px rgba(229, 72, 77, 0.6);
+}
+.sz-name {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffd9b0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+.mplay .sell-zone {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  width: auto;
+  height: 88px;
+}

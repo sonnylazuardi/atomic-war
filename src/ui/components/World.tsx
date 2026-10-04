@@ -47,6 +47,10 @@ export interface WorldProps {
   onBattleDone: () => void;
   /** prep: clicking a hero with pendingUpgrades > 0 (its golden beacon is lit) levels it up */
   onUpgradeHero?: (uid: string) => void;
+  /** prep: a hero sprite drag really started (past the movement threshold, never on a tap) */
+  onHeroDragStart?: (uid: string) => void;
+  /** prep: the drag ended (always called after a start, wherever it was released). Client coords. */
+  onHeroDragEnd?: (uid: string, clientX: number, clientY: number) => void;
   /** visible region of the 1000x600 arena (default the whole arena). Mobile uses MOBILE_VIEWBOX. */
   viewBox?: WorldViewBox;
   /** how the viewBox fills the container (default 'slice': cover, HUD overlays the edges) */
@@ -150,6 +154,8 @@ interface Drag {
   y: number;
   moved: boolean;
   hover: BoardSlot | null;
+  cx: number; // last client coords
+  cy: number;
 }
 
 interface WS {
@@ -544,7 +550,7 @@ export function World(props: WorldProps) {
     const a = ws.actors.get(uid);
     if (!a) return;
     const p = toArena(e.clientX, e.clientY);
-    ws.drag = { uid, pointerId: e.pointerId, sx: p.x, sy: p.y, ox: a.x - p.x, oy: a.y - p.y, x: a.x, y: a.y, moved: false, hover: null };
+    ws.drag = { uid, pointerId: e.pointerId, sx: p.x, sy: p.y, ox: a.x - p.x, oy: a.y - p.y, x: a.x, y: a.y, moved: false, hover: null, cx: e.clientX, cy: e.clientY };
     try {
       svgRef.current?.setPointerCapture(e.pointerId);
     } catch {
@@ -560,17 +566,26 @@ export function World(props: WorldProps) {
     const d = ws.drag;
     if (!d || d.pointerId !== e.pointerId) return;
     const p = toArena(e.clientX, e.clientY);
-    if (!d.moved && Math.hypot(p.x - d.sx, p.y - d.sy) > 6) d.moved = true;
+    d.cx = e.clientX;
+    d.cy = e.clientY;
+    if (!d.moved && Math.hypot(p.x - d.sx, p.y - d.sy) > 6) {
+      d.moved = true;
+      propsRef.current.onHeroDragStart?.(d.uid);
+    }
     if (!d.moved) return;
     d.x = Math.max(40, Math.min(ARENA_W - 40, p.x + d.ox));
     d.y = Math.max(70, Math.min(ARENA_H - 20, p.y + d.oy));
-    d.hover = slotAt(d.x, d.y);
+    d.hover = insideSvg(e.clientX, e.clientY) ? slotAt(d.x, d.y) : null;
     const a = ws.actors.get(d.uid);
     if (a) {
       if (Math.abs(d.x - a.x) > 1.5) a.facing = d.x > a.x ? 1 : -1;
       a.x = d.x;
       a.y = d.y;
     }
+  };
+  const insideSvg = (cx: number, cy: number) => {
+    const r = svgRef.current?.getBoundingClientRect();
+    return !!r && cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
   };
   const onSvgUp = (e: RPointerEvent) => {
     const d = ws.drag;
@@ -585,7 +600,9 @@ export function World(props: WorldProps) {
         return;
       }
       if (a) moveActor(a, a.toX, a.toY, ws.now); // slide back unless props move it elsewhere
-      if (d.hover && a && !sameSlot(d.hover, a.slot)) p.onPlaceHero(d.uid, d.hover);
+      const hover = insideSvg(e.clientX, e.clientY) ? d.hover : null;
+      if (hover && a && !sameSlot(hover, a.slot)) p.onPlaceHero(d.uid, hover);
+      p.onHeroDragEnd?.(d.uid, e.clientX, e.clientY);
       return;
     }
     const f = ws.floorDown;
@@ -601,6 +618,7 @@ export function World(props: WorldProps) {
     ws.floorDown = null;
     const a = d ? ws.actors.get(d.uid) : undefined;
     if (a) moveActor(a, a.toX, a.toY, ws.now);
+    if (d?.moved) propsRef.current.onHeroDragEnd?.(d.uid, d.cx, d.cy);
   };
 
   const dndOverHero = (uid: string, e: DragEvent) => {

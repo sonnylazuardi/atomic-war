@@ -1,10 +1,10 @@
-// Post-battle banner over the world: VICTORY / DEFEAT −X HP / DRAW + other matchups. Auto-continues.
-import { useEffect } from 'react';
+// Post-battle banner over the world: VICTORY / DEFEAT −X HP / DRAW + other matchups. Advances on the phase deadline.
+import { RESULTS_TIME } from '../../../core/constants.ts';
 import { useGame } from '../../store.ts';
 
-const AUTO_MS = 3000;
 
-export function ResultToast() {
+
+export function ResultToast({ left }: { left: number | null }) {
   const g = useGame();
   const me = g.players[0]!;
   const mine = g.reports.find((r) => r.pairing.left === 0 || r.pairing.right === 0);
@@ -16,14 +16,6 @@ export function ResultToast() {
   const label = result === 'win' ? 'Victory' : result === 'loss' ? 'Defeat' : 'Draw';
   const name = (id: number) => g.players[id]?.name ?? `Player ${id + 1}`;
 
-  useEffect(() => {
-    const round = useGame.getState().round;
-    const h = setTimeout(() => {
-      const s = useGame.getState();
-      if (s.phase === 'results' && s.round === round) s.nextRound();
-    }, AUTO_MS);
-    return () => clearTimeout(h);
-  }, []);
 
   return (
     <div className={`result-toast ${result ?? 'draw'}`} data-testid="results">
@@ -45,10 +37,10 @@ export function ResultToast() {
             </li>
           ))}
       </ul>
-      <button className="btn btn-ready rt-btn" data-testid="continue" onClick={() => g.nextRound()}>
-        Continue
-        <span className="rt-timer" style={{ animationDuration: `${AUTO_MS}ms` }} />
-      </button>
+      <div className="rt-next">
+        next round in <b>{left ?? '…'}</b>
+        <span className="rt-timer" style={{ animationDuration: `${RESULTS_TIME * 1000}ms` }} />
+      </div>
     </div>
   );
 }
