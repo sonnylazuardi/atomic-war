@@ -1,0 +1,7 @@
+{
+  // Cloudflare Pages project (git-connected). Build command `bun run build`, output `dist`.
+  // Pages build env: BUN_VERSION=1.4.2. Static SPA from dist/, /api/* via functions/ (Hono).
+  "name": "atomic-war",
+  "compatibility_date": "2026-09-01",
+  "pages_build_output_dir": "./dist"
+}
