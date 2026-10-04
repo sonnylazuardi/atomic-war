@@ -1,11 +1,12 @@
 import { boardCap } from '../../../core/constants.ts';
 import { boardCount } from '../../../core/game/index.ts';
+import { useMe } from '../../me.ts';
 import { useGame } from '../../store.ts';
 
 export function TopCenter({ timer, enemy }: { timer: number | null; enemy: string | null }) {
   const round = useGame((s) => s.round);
   const phase = useGame((s) => s.phase);
-  const me = useGame((s) => s.players[0]!);
+  const me = useMe();
   const cap = boardCap(round);
   const n = boardCount(me);
   const label = phase === 'battle' ? 'Battle' : phase === 'prep' ? 'Preparation' : phase === 'game_over' ? 'Game Over' : 'Results';

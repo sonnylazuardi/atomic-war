@@ -1,5 +1,6 @@
 // Bottom-right inventory grid: spells then items. Drag onto heroes, click-to-assign, right-click sells.
 import { SELL_ITEM, SELL_SPELL } from '../../../core/constants.ts';
+import { meOf } from '../../me.ts';
 import { useGame } from '../../store.ts';
 import { itemDef, spellDef, starColor } from '../defs.ts';
 import { dragProps, useDrop } from '../dnd.ts';
@@ -12,7 +13,7 @@ const MIN_CELLS = 12;
 export function InventoryGrid() {
   const g = useGame();
   const ui = useUi();
-  const me = g.players[0]!;
+  const me = meOf(g);
   const prep = g.phase === 'prep';
   const drop = useDrop(
     (p) => prep && (p.kind === 'spellSlot' || p.kind === 'itemSlot'),

@@ -2,6 +2,7 @@
 import type { ReactNode } from 'react';
 import { MAX_SHOP_LEVEL, shopUpgradeCost } from '../../../core/constants.ts';
 import { FORGES_FOR_DIVINE, lordActiveAvailable, refreshCostFor } from '../../../core/game/lords.ts';
+import { useMe } from '../../me.ts';
 import { useGame } from '../../store.ts';
 import { lordDef, starColor } from '../defs.ts';
 import { LordTip, tip } from '../Tooltip.tsx';
@@ -45,7 +46,7 @@ function KeyButton({ k, label, testid, disabled, active, badge, poor, onClick, t
 }
 
 export function Dock({ shopOpen, onToggleShop }: { shopOpen: boolean; onToggleShop: () => void }) {
-  const me = useGame((s) => s.players[0]!);
+  const me = useMe();
   const phase = useGame((s) => s.phase);
   const upgradeShop = useGame((s) => s.upgradeShop);
   const lordTargeting = useUi((s) => s.lordTargeting);

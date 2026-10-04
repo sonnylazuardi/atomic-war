@@ -1,5 +1,6 @@
 // Mobile: sticky hint/action bar for tap-to-assign (no drag-and-drop on touch screens).
 import { SELL_ITEM, SELL_SPELL } from '../../../core/constants.ts';
+import { meOf } from '../../me.ts';
 import { useGame } from '../../store.ts';
 import { itemDef, spellDef } from '../defs.ts';
 import { useUi } from '../uiState.ts';
@@ -7,7 +8,7 @@ import { useUi } from '../uiState.ts';
 export function MobileBar() {
   const g = useGame();
   const ui = useUi();
-  const me = g.players[0]!;
+  const me = meOf(g);
   if (g.phase !== 'prep') return null;
   const cancel = () => {
     ui.setPending(null);

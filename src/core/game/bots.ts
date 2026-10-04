@@ -8,7 +8,7 @@ import type { Attr, Effect, GameState, HeroClass, ItemId, LordId, OwnedHero, Pla
 import { lordActiveAvailable, refreshCostFor, spellCostFor, useLordAbilityM } from './lords.ts';
 import { assignSpellM, equipItemM, sellHeroM, sellItemM, sellSpellM, upgradeHeroM } from './roster.ts';
 import { buyHeroM, buyItemM, buySpellM, itemCost, refreshShopM, upgradeShopM } from './shop.ts';
-import { benchCount, firstFreeSlot, isInnate, withRng, type GS } from './util.ts';
+import { benchCount, firstFreeSlot, isInnate, pure, withRng, type GS } from './util.ts';
 
 const spellStars = (id: SpellId) => SPELLS[id]?.stars ?? 1;
 /** a bought spell must beat an innate one by this many stars before a bot destroys the innate */
@@ -320,3 +320,6 @@ export function botPrepM(s: GS, pid: number) {
   useLord(s, p, 'end');
   arrangeBoard(s, p);
 }
+
+/** Pure: run the bot AI's prep for one seat (bots, or an autopilot human). */
+export const botPrep = (state: GameState, pid: number): GameState => pure(botPrepM)(state, pid);

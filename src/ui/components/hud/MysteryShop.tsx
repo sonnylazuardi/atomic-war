@@ -3,6 +3,7 @@
 import type { CSSProperties } from 'react';
 import { HERO_COST, LEVELS_PER_UPGRADE, MAX_HERO_LEVEL } from '../../../core/constants.ts';
 import { refreshCostFor, spellCostFor } from '../../../core/game/lords.ts';
+import { meOf } from '../../me.ts';
 import { useGame } from '../../store.ts';
 import { CLASS_INFO, heroDef, itemDef, spellDef, starColor } from '../defs.ts';
 import { HeroPortrait } from '../HeroPortrait.tsx';
@@ -17,7 +18,7 @@ const colOf = (i: number, n: number): CSSProperties => ({ gridColumn: (SPREAD[n]
 
 export function MysteryShop({ onClose, mobile = false }: { onClose: () => void; mobile?: boolean }) {
   const g = useGame();
-  const me = g.players[0]!;
+  const me = meOf(g);
   const spellCost = safe(() => spellCostFor(me), 3);
   const refresh = safe(() => refreshCostFor(me), 1);
   const owned = new Set(me.heroes.map((h) => h.heroId));

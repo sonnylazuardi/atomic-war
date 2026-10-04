@@ -1,16 +1,18 @@
 // Post-battle banner over the world: VICTORY / DEFEAT −X HP / DRAW + other matchups. Advances on the phase deadline.
 import { RESULTS_TIME } from '../../../core/constants.ts';
+import { meOf, selfIdOf } from '../../me.ts';
 import { useGame } from '../../store.ts';
 
 
 
 export function ResultToast({ left }: { left: number | null }) {
   const g = useGame();
-  const me = g.players[0]!;
-  const mine = g.reports.find((r) => r.pairing.left === 0 || r.pairing.right === 0);
+  const me = meOf(g);
+  const self = selfIdOf(g);
+  const mine = g.reports.find((r) => r.pairing.left === self || r.pairing.right === self);
   let result = me.lastResult;
   if (!result && mine) {
-    const side = mine.pairing.left === 0 ? 'left' : 'right';
+    const side = mine.pairing.left === self ? 'left' : 'right';
     result = mine.winner === 'draw' ? 'draw' : mine.winner === side ? 'win' : 'loss';
   }
   const label = result === 'win' ? 'Victory' : result === 'loss' ? 'Defeat' : 'Draw';

@@ -3,6 +3,7 @@ import { LEVELS_PER_UPGRADE, MAX_HEROES } from '../../../core/constants.ts';
 import { boardOrder } from '../../../core/game/index.ts';
 import { teamModsFor } from '../../../core/game/lords.ts';
 import type { ItemId, OwnedHero, SpellId, TeamMods } from '../../../core/types.ts';
+import { useMe } from '../../me.ts';
 import { useGame } from '../../store.ts';
 import { CLASS_INFO, fmt, heroDef, itemDef, safeStats, spellDef, starColor } from '../defs.ts';
 import { dragProps, useDrop } from '../dnd.ts';
@@ -190,7 +191,7 @@ function TabIcon({ kind }: { kind: RosterTab }) {
 }
 
 export function Roster() {
-  const me = useGame((s) => s.players[0]!);
+  const me = useMe();
   const phase = useGame((s) => s.phase);
   const tab = useUi((s) => s.rosterTab);
   const setTab = useUi((s) => s.setRosterTab);

@@ -18,8 +18,24 @@ import { UnitCard } from '../components/hud/UnitCard.tsx';
 import { hideTip } from '../components/Tooltip.tsx';
 import { useUi } from '../components/uiState.ts';
 import { World } from '../components/World.tsx';
+import { selfIdOf } from '../me.ts';
 import { useGame } from '../store.ts';
 import { GameOver } from './GameOver.tsx';
+import { useNet } from '../../net/session.ts';
+import { ONLINE_CSS } from './online/online.css.ts';
+
+/** Online: our replay ended but the server waits for every battle before moving to results. */
+function OnlineWait() {
+  const waiting = useNet((s) => s.inGame && s.waitingOthers);
+  const phase = useGame((s) => s.phase);
+  if (!waiting || phase !== 'battle') return null;
+  return (
+    <div className="ol-banner" data-testid="waiting-others">
+      <style>{ONLINE_CSS}</style>
+      Waiting for other battles…
+    </div>
+  );
+}
 
 /** Deadline-driven phase clock (same for every player — multiplayer-ready). The store sets
  *  state.phaseDeadline on every phase/round change; when it passes: prep -> battle, results -> next round. */
@@ -64,6 +80,7 @@ export function Play() {
   const round = useGame((s) => s.round);
   const seed = useGame((s) => s.seed);
   const players = useGame((s) => s.players);
+  const selfId = useGame((s) => selfIdOf(s));
   const pairings = useGame((s) => s.pairings);
   const humanBattle = useGame((s) => s.humanBattle);
   const humanSide = useGame((s) => s.humanSide);
@@ -72,7 +89,7 @@ export function Play() {
   const lordTargeting = useUi((s) => s.lordTargeting);
   const pending = useUi((s) => s.pending);
   const mobile = useLayoutMode() === 'mobile';
-  const me = players[0]!;
+  const me = players[selfId]!;
   const prep = phase === 'prep';
   const battle = phase === 'battle';
 
@@ -92,11 +109,11 @@ export function Play() {
 
   const timer = usePhaseTimer();
 
-  const pairing = pairings.find((p) => p.left === 0 || p.right === 0) ?? null;
-  const oppId = pairing ? (pairing.left === 0 ? pairing.right : pairing.left) : null;
+  const pairing = pairings.find((p) => p.left === selfId || p.right === selfId) ?? null;
+  const oppId = pairing ? (pairing.left === selfId ? pairing.right : pairing.left) : null;
   const opp = oppId !== null ? players[oppId] : undefined;
   const enemyName = opp ? `${opp.name}${pairing?.ghost && pairing.right === oppId ? ' (ghost)' : ''}` : null;
-  const homeTerrain = terrainForPlayer(0, seed);
+  const homeTerrain = terrainForPlayer(selfId, seed);
   const hostTerrain = battle && pairing ? terrainForPlayer(pairing.left, seed) : homeTerrain;
   const heroes = useMemo(() => me.heroes.filter((h) => h.slot !== null), [me.heroes]);
   const names = useMemo(() => ({ human: me.name, enemy: enemyName ?? 'Enemy' }), [me.name, enemyName]);
@@ -232,6 +249,7 @@ export function Play() {
         {prep && shopOpen && <MysteryShop mobile onClose={() => setShopOpen(false)} />}
         {phase === 'results' && <ResultToast left={timer} />}
         {phase === 'game_over' && <GameOver />}
+        <OnlineWait />
       </div>
     );
   }
@@ -254,6 +272,7 @@ export function Play() {
         {prep && shopOpen && <MysteryShop onClose={() => setShopOpen(false)} />}
         {phase === 'results' && <ResultToast left={timer} />}
         {lordTargeting && prep && <div className="hud-banner">Choose a hero for your lord ability · Esc cancels</div>}
+        <OnlineWait />
       </div>
       {phase === 'game_over' && <GameOver />}
     </div>

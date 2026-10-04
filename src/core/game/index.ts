@@ -3,7 +3,8 @@ export * from './match.ts';
 export * from './shop.ts';
 export * from './roster.ts';
 export * from './lords.ts';
-export { botPrepM, botPickLord, spellScore } from './bots.ts';
+export { botPrep, botPrepM, botPickLord, spellScore } from './bots.ts';
+export { viewFor } from './view.ts';
 export {
   boardCount,
   benchCount,

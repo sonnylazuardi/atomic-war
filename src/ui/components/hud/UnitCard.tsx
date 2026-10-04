@@ -1,6 +1,7 @@
 // Selected-unit card: portrait, stats, Sell / To bench / To board.
 import { SELL_HERO } from '../../../core/constants.ts';
 import { teamModsFor } from '../../../core/game/lords.ts';
+import { meOf } from '../../me.ts';
 import { useGame } from '../../store.ts';
 import { ATTR_INFO, CLASS_INFO, fmt, heroDef, safeStats } from '../defs.ts';
 import { HeroPortrait } from '../HeroPortrait.tsx';
@@ -12,7 +13,7 @@ import { Stars } from './Stars.tsx';
 export function UnitCard() {
   const g = useGame();
   const ui = useUi();
-  const me = g.players[0]!;
+  const me = meOf(g);
   const hero = ui.selectedUid ? me.heroes.find((h) => h.uid === ui.selectedUid) : undefined;
   if (!hero) return null;
   const prep = g.phase === 'prep';

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun --hot server/index.ts",
     "start": "NODE_ENV=production bun server/index.ts",
-    "build": "rm -rf dist && bun build ./index.html --outdir dist --production",
+    "build": "rm -rf dist && NODE_ENV=production bun build ./index.html --outdir dist --production --env='PUBLIC_*'",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "bun test",
     "smoke": "bun e2e/smoke.ts",

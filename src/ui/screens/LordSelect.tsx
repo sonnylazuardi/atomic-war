@@ -74,9 +74,14 @@ export function LordSelect() {
     g.pickLord(id);
   };
 
-  const left = PICK_TIME - t;
+  // online: the server's lord-select deadline (already converted to the local clock); offline: 30 s from mount
+  const deadline = g.phaseDeadline ?? null;
+  const left = deadline != null ? (deadline - Date.now()) / 1000 : PICK_TIME - t;
+  const total = deadline != null ? Math.max(PICK_TIME, Math.ceil(left)) : PICK_TIME;
+  const picked = deadline != null && !!g.players[g.selfId ?? 0]?.lordId;
   useEffect(() => {
-    if (timer && left <= 0) pick(sel);
+    // online: send our selection a moment before the server's own auto-pick (first offered lord)
+    if (deadline != null ? left <= 1 : timer && left <= 0) pick(sel);
   });
 
   useEffect(() => {
@@ -103,7 +108,7 @@ export function LordSelect() {
         <SummonerAmbient t={t} />
       </div>
       <div className="sm-content">
-        {timer ? <Countdown left={left} total={PICK_TIME} /> : null}
+        {timer || deadline != null ? <Countdown left={left} total={total} /> : null}
         <h1 className="sm-title">Choose Your Summoner</h1>
         <div className="sm-row" role="listbox" aria-label="Summoners">
           {choices.map((id, i) => {
@@ -159,6 +164,11 @@ export function LordSelect() {
         </div>
         <div className="sm-hint">Click to select · double-click or START to summon · 1–4 / Enter / R</div>
       </div>
+      {picked && (
+        <div className="sm-waiting" data-testid="lord-waiting">
+          Waiting for the other summoners…
+        </div>
+      )}
     </div>
   );
 }

@@ -21,7 +21,7 @@ import { HERO_IDS, HERO_KITS, ITEM_IDS, SPELL_IDS } from '../ids.ts';
 import type { Rng } from '../rng.ts';
 import type { GameState, HeroId, ItemId, OwnedHero, PlayerState, SpellId, Stars } from '../types.ts';
 import { addLevels, refreshCostFor, spellCostFor } from './lords.ts';
-import { benchCount, boardCount, fail, firstFreeSlot, heroName, log, pure, withRng, type GS } from './util.ts';
+import { say, benchCount, boardCount, fail, firstFreeSlot, heroName, pure, withRng, type GS } from './util.ts';
 
 export function itemCost(id: ItemId): number {
   return ITEMS[id]?.cost ?? 3;
@@ -171,7 +171,7 @@ export function buyHeroM(s: GS, pid: number, offerIdx: number) {
     // like the real game: picking a hero you already own levels it up on the spot
     if (owned.level >= MAX_HERO_LEVEL) return fail(s, p, `${heroName(heroId)} is already max level.`);
     addLevels(owned, LEVELS_PER_UPGRADE);
-    if (p.isHuman) log(s, `${heroName(heroId)} upgraded to Lv ${owned.level}!`);
+    if (p.isHuman) say(s, p, `${heroName(heroId)} upgraded to Lv ${owned.level}!`);
   } else {
     let slot = null;
     if (boardCount(p) < boardCap(s.round)) slot = firstFreeSlot(p, heroId);
@@ -179,7 +179,7 @@ export function buyHeroM(s: GS, pid: number, offerIdx: number) {
     const h = makeHero(s, pid, heroId);
     h.slot = slot;
     p.heroes.push(h);
-    if (p.isHuman) log(s, `Recruited ${heroName(heroId)}.`);
+    if (p.isHuman) say(s, p, `Recruited ${heroName(heroId)}.`);
   }
   p.coins -= HERO_COST;
   p.shop.heroOffers[offerIdx] = null;
@@ -233,7 +233,7 @@ export function upgradeShopM(s: GS, pid: number) {
   const from = p.shopLevel;
   p.shopLevel++;
   rollExtraOffers(s, p, from, p.shopLevel);
-  if (p.isHuman) log(s, `Shop upgraded to level ${p.shopLevel}.`);
+  if (p.isHuman) say(s, p, `Shop upgraded to level ${p.shopLevel}.`);
 }
 
 export function toggleLockM(s: GS, pid: number) {

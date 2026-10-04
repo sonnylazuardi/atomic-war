@@ -1,0 +1,3 @@
+# Inline PUBLIC_* env vars into browser bundles served by the dev server (Bun.serve HTML imports)
+[serve.static]
+env = "PUBLIC_*"

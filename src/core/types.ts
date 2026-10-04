@@ -310,7 +310,15 @@ export interface PlayerState {
   spellInventory: SpellId[];
   itemInventory: ItemId[];
   streak: number; // + win streak / - loss streak
+  /** online only: this player's private messages (purchase errors, upgrades). viewFor shows them as `log`. */
+  log?: string[];
   lastResult: 'win' | 'loss' | 'draw' | null;
+  /** lords offered to this (human) seat in lord_select. Offline seat 0 mirrors GameState.lordChoices. */
+  lordChoices?: LordId[];
+  /** this seat already used its one lord reroll */
+  lordRerollUsed?: boolean;
+  /** online: the bot AI plays this human seat (disconnected) */
+  autopilot?: boolean;
 }
 
 export interface Pairing {
@@ -325,6 +333,8 @@ export interface RoundReport {
   winner: Team | 'draw';
   damageToLoser: number;
   duration: number;
+  /** battle seed: runBattle(pairingInputs(s, pairing), seed) reproduces this battle */
+  seed?: number;
 }
 
 export type Phase = 'lord_select' | 'prep' | 'battle' | 'results' | 'game_over';
@@ -349,6 +359,13 @@ export interface GameState {
    * Set by the store (the clock authority), never by the pure core reducers. null = no timer.
    */
   phaseDeadline?: number | null;
+  /** the seat (player id) this client controls. Offline single-player: 0. Online: set by the server's
+   *  per-viewer GameView. UI code must use players[selfId ?? 0], never players[0]. */
+  selfId?: number;
+  /** true for a multi-human (server-run) match created with newGame(seed, { humans }). Lord choices then live
+   *  per player (PlayerState.lordChoices), every human's battle is resolved, and the game ends when <= 1
+   *  player or no human is alive. Absent/false = offline single-player (human at seat 0). */
+  online?: boolean;
 }
 
 // ---------------------------------------------------------------- battle sim I/O

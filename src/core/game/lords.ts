@@ -1,7 +1,7 @@
 // Lord logic. Data in core/data/lords.ts.
 import { MAX_HERO_LEVEL, PLAYER_START_HP, REFRESH_COST, SPELL_COST, spellSlotsForLevel } from '../constants.ts';
 import type { GameState, LordId, OwnedHero, PlayerState, TeamMods } from '../types.ts';
-import { fail, findHero, log, pure, type GS } from './util.ts';
+import { say, fail, findHero, pure, type GS } from './util.ts';
 import { rollExtraOffers } from './shop.ts';
 
 export const FORGES_FOR_DIVINE = 8;
@@ -125,8 +125,8 @@ export function useLordAbilityM(s: GS, pid: number, targetUid?: string) {
             }
           }
         }
-        if (p.isHuman) log(s, 'The Divine Sword of the Sun is forged!');
-      } else if (p.isHuman) log(s, `Forged (${p.lordState.forges}/${FORGES_FOR_DIVINE}).`);
+        if (p.isHuman) say(s, p, 'The Divine Sword of the Sun is forged!');
+      } else if (p.isHuman) say(s, p, `Forged (${p.lordState.forges}/${FORGES_FOR_DIVINE}).`);
       return;
     }
     case 'bounty_hunter': {
@@ -134,7 +134,7 @@ export function useLordAbilityM(s: GS, pid: number, targetUid?: string) {
       if (bank <= 0) return fail(s, p, 'Bank is empty.');
       p.coins += bank;
       p.lordState.bank = 0;
-      if (p.isHuman) log(s, `Withdrew ${bank} coins from the bank.`);
+      if (p.isHuman) say(s, p, `Withdrew ${bank} coins from the bank.`);
       return;
     }
     case 'omniknight': {
@@ -144,7 +144,7 @@ export function useLordAbilityM(s: GS, pid: number, targetUid?: string) {
       if (h.level >= MAX_HERO_LEVEL) return fail(s, p, 'That hero is already max level.');
       addLevels(h, OMNI_LEVELS);
       p.lordState.used = 1;
-      if (p.isHuman) log(s, `Purification! Hero is now level ${h.level}.`);
+      if (p.isHuman) say(s, p, `Purification! Hero is now level ${h.level}.`);
       return;
     }
     default:

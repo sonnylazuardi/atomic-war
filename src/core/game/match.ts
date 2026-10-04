@@ -44,6 +44,8 @@ export const BOT_NAMES = [
 export interface NewGameOptions {
   /** player 0 is also a bot (headless simulations / tests) */
   allBots?: boolean;
+  /** online match: seats 0..n-1 are these humans (1..8), the remaining seats are bots */
+  humans?: { name: string }[];
 }
 
 function makePlayer(id: number, name: string, isHuman: boolean, coins: number): PlayerState {
@@ -98,6 +100,29 @@ export function newGame(seed: number = randomSeed(), opts: NewGameOptions = {}):
     log: [],
   };
   const income = incomeForRound(1);
+  const humans = opts.humans?.slice(0, PLAYER_COUNT);
+  if (humans && humans.length > 0) {
+    // online: seats 0..n-1 humans, the rest bots
+    s.online = true;
+    const n = humans.length;
+    for (let i = 0; i < PLAYER_COUNT; i++) {
+      const name = i < n ? humans[i]!.name : names[(i - n) % names.length]!;
+      s.players.push(makePlayer(i, name, i < n, income));
+    }
+    for (const p of s.players) rollShop(s, p);
+    for (const p of s.players) if (!p.isHuman) applyLordPick(s, p, botPickLord(s));
+    // deal each human its own choices, disjoint from earlier humans' while the pool lasts
+    let dealt: LordId[] = [];
+    for (const p of s.players) {
+      if (!p.isHuman) continue;
+      if (LORD_IDS.length - dealt.length < LORD_CHOICES) dealt = [];
+      p.lordChoices = rollLordChoices(s, dealt);
+      p.lordRerollUsed = false;
+      dealt.push(...p.lordChoices);
+    }
+    log(s, 'Choose your Lord.');
+    return s;
+  }
   for (let i = 0; i < PLAYER_COUNT; i++) {
     const human = i === 0 && !opts.allBots;
     s.players.push(makePlayer(i, i === 0 ? 'You' : names[(i - 1) % names.length]!, human, income));
@@ -109,6 +134,9 @@ export function newGame(seed: number = randomSeed(), opts: NewGameOptions = {}):
   }
   if (s.players.some((p) => p.isHuman)) {
     s.lordChoices = rollLordChoices(s);
+    // offline: seat 0 mirrors the top-level choices
+    s.players[0]!.lordChoices = [...s.lordChoices];
+    s.players[0]!.lordRerollUsed = false;
     log(s, 'Choose your Lord.');
   } else {
     s.phase = 'prep';
@@ -116,28 +144,76 @@ export function newGame(seed: number = randomSeed(), opts: NewGameOptions = {}):
   return s;
 }
 
-export function pickLordM(s: GS, pid: number, lordId: LordId) {
-  const p = s.players[pid];
-  if (!p) return;
-  if (s.phase !== 'lord_select') return fail(s, p, 'Lord already chosen.');
-  if (p.isHuman && !s.lordChoices.includes(lordId)) return fail(s, p, 'That lord is not on offer.');
-  applyLordPick(s, p, lordId);
+/** Lords offered to a seat: per player online, the top-level list offline. */
+function choicesOf(s: GameState, p: PlayerState): LordId[] {
+  return s.online ? (p.lordChoices ?? []) : s.lordChoices;
+}
+
+/** lord_select -> prep once every human seat has a lord. */
+function maybeStartPrep(s: GS) {
+  if (s.phase !== 'lord_select') return;
+  if (s.players.some((p) => p.isHuman && p.lordId === null)) return;
   s.phase = 'prep';
   log(s, `Round ${s.round}: prepare for battle!`);
 }
 
+export function pickLordM(s: GS, pid: number, lordId: LordId) {
+  const p = s.players[pid];
+  if (!p) return;
+  if (s.phase !== 'lord_select' || (s.online && p.lordId !== null)) return fail(s, p, 'Lord already chosen.');
+  if (p.isHuman && !choicesOf(s, p).includes(lordId)) return fail(s, p, 'That lord is not on offer.');
+  applyLordPick(s, p, lordId);
+  if (s.online) log(s, `${p.name} chose a lord.`);
+  if (s.online) maybeStartPrep(s);
+  else {
+    s.phase = 'prep';
+    log(s, `Round ${s.round}: prepare for battle!`);
+  }
+}
+
 export function rerollLordsM(s: GS, pid: number) {
   const p = s.players[pid];
-  if (s.phase !== 'lord_select') return;
+  if (!p || s.phase !== 'lord_select') return;
+  if (s.online) {
+    if (!p.isHuman || p.lordId !== null) return;
+    if (p.lordRerollUsed) return fail(s, p, 'Reroll already used.');
+    p.lordRerollUsed = true;
+    p.lordChoices = rollLordChoices(s, p.lordChoices ?? []);
+    return;
+  }
   if (s.lordRerollUsed) return fail(s, p, 'Reroll already used.');
   s.lordRerollUsed = true;
   s.lordChoices = rollLordChoices(s, s.lordChoices);
+  p.lordRerollUsed = true;
+  p.lordChoices = [...s.lordChoices];
+}
+
+/** Lord-select timeout: every human without a lord gets its first offered lord -> prep. */
+export function autoPickLordsM(s: GS) {
+  if (s.phase !== 'lord_select') return;
+  for (const p of s.players) {
+    if (!p.isHuman || p.lordId !== null) continue;
+    const pick = choicesOf(s, p)[0] ?? LORD_IDS[0]!;
+    applyLordPick(s, p, pick);
+  }
+  maybeStartPrep(s);
 }
 
 // ---------------------------------------------------------------- battles
 
 function teamInput(s: GameState, p: PlayerState): BattleTeamInput {
   return { playerId: p.id, heroes: structuredClone(fighters(p, s.round)), mods: teamModsFor(p) };
+}
+
+/** The exact battle inputs readyForBattle used for `pairing` (ghost side = copy of that player's team).
+ *  Valid between readyForBattle and finishBattle; replay with runBattle(left, right, report.seed, …). */
+export function pairingInputs(s: GameState, pairing: Pairing): { left: BattleTeamInput; right: BattleTeamInput } {
+  return { left: teamInput(s, s.players[pairing.left]!), right: teamInput(s, s.players[pairing.right]!) };
+}
+
+export interface ReadyOptions {
+  /** record the viewer's (selfId ?? 0, if human) battle into humanBattle. Default true; the server passes false. */
+  record?: boolean;
 }
 
 function syntheticResult(left: BattleTeamInput, right: BattleTeamInput, seed: number): BattleResult {
@@ -174,9 +250,9 @@ function survivorLevels(team: BattleTeamInput, uids: string[]): number[] {
   return uids.map((u) => byUid.get(u)?.level).filter((x): x is number => x !== undefined);
 }
 
-export function readyForBattleM(s: GS) {
+export function readyForBattleM(s: GS, opts: ReadyOptions = {}) {
   if (s.phase !== 'prep') return;
-  for (const p of s.players) if (p.alive && !p.isHuman) botPrepM(s, p.id);
+  for (const p of s.players) if (p.alive && (!p.isHuman || p.autopilot === true)) botPrepM(s, p.id);
   for (const p of s.players) if (p.alive) onLeavePrep(p);
 
   const alive = s.players.filter((p) => p.alive).map((p) => p.id);
@@ -197,6 +273,8 @@ export function readyForBattleM(s: GS) {
   s.reports = [];
   s.humanBattle = null;
   s.humanSide = 'left';
+  const viewerId = s.selfId ?? 0;
+  const viewer = opts.record !== false && s.players[viewerId]?.isHuman ? viewerId : -1;
   const gains: Record<number, PendingGains> = {};
   const damage: Record<number, number> = {};
   const results: Record<number, 'win' | 'loss' | 'draw'> = {};
@@ -206,7 +284,8 @@ export function readyForBattleM(s: GS) {
     const rp = s.players[pr.right]!;
     const left = teamInput(s, lp);
     const right = teamInput(s, rp);
-    const humanSide: Team | null = lp.isHuman ? 'left' : rp.isHuman && !pr.ghost ? 'right' : null;
+    const humanSide: Team | null =
+      pr.left === viewer ? 'left' : pr.right === viewer && !pr.ghost ? 'right' : null;
     const res = resolve(left, right, seeds[i]!, humanSide !== null);
     if (humanSide) {
       s.humanBattle = res;
@@ -248,7 +327,7 @@ export function readyForBattleM(s: GS) {
         results[pr.right] = 'draw';
       }
     }
-    const report: RoundReport = { round: s.round, pairing: pr, winner: res.winner, damageToLoser, duration: res.duration };
+    const report: RoundReport = { round: s.round, pairing: pr, winner: res.winner, damageToLoser, duration: res.duration, seed: seeds[i]! };
     s.reports.push(report);
   });
 
@@ -283,7 +362,7 @@ export function finishBattleM(s: GS) {
       else if (r === 'loss') p.streak = Math.min(0, p.streak) - 1;
       else p.streak = 0;
     }
-    if (p.isHuman && r) {
+    if (p.isHuman && r && !s.online) {
       const d = damage[p.id] ?? 0;
       log(s, r === 'win' ? `Round ${s.round}: victory!` : `Round ${s.round}: ${r} — you lose ${d} HP.`);
     }
@@ -294,7 +373,7 @@ export function finishBattleM(s: GS) {
   for (const p of dead) {
     p.alive = false;
     p.placement = place--;
-    if (!p.isHuman) log(s, `${p.name} has been eliminated (#${p.placement}).`);
+    if (!p.isHuman || s.online) log(s, `${p.name} has been eliminated (#${p.placement}).`);
   }
   for (const p of s.players) p.hp = Math.max(0, p.hp);
 
@@ -305,9 +384,10 @@ export function finishBattleM(s: GS) {
   delete s.pendingDamage;
   delete s.pendingResult;
 
-  const alive = s.players.filter((p) => p.alive);
-  const human = s.players.find((p) => p.isHuman);
-  if (alive.length <= 1 || (human && !human.alive)) {
+  const alive = alivePlayers(s);
+  const human = s.online ? undefined : s.players.find((p) => p.isHuman);
+  const over = s.online ? alive.length <= 1 || allHumansDead(s) : alive.length <= 1 || (human && !human.alive);
+  if (over) {
     // rank everyone still standing by hp
     alive
       .sort((a, b) => b.hp - a.hp || a.id - b.id)
@@ -321,6 +401,16 @@ export function finishBattleM(s: GS) {
     return;
   }
   s.phase = 'results';
+}
+
+export function alivePlayers(s: GameState): PlayerState[] {
+  return s.players.filter((p) => p.alive);
+}
+
+/** true when the match has human seats and none of them is alive */
+export function allHumansDead(s: GameState): boolean {
+  const humans = s.players.filter((p) => p.isHuman);
+  return humans.length > 0 && humans.every((p) => !p.alive);
 }
 
 export function nextRoundM(s: GS) {
@@ -340,7 +430,8 @@ export function nextRoundM(s: GS) {
 
 export const pickLord = (state: GameState, lordId: LordId, pid = 0) => pure(pickLordM)(state, pid, lordId);
 export const rerollLords = (state: GameState, pid = 0) => pure(rerollLordsM)(state, pid);
-export const readyForBattle = pure(readyForBattleM);
+export const autoPickLords = (state: GameState): GameState => pure(autoPickLordsM)(state);
+export const readyForBattle = (state: GameState, opts?: ReadyOptions): GameState => pure(readyForBattleM)(state, opts);
 export const finishBattle = pure(finishBattleM);
 export const nextRound = pure(nextRoundM);
 

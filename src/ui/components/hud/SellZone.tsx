@@ -1,5 +1,6 @@
 // Trash zone (bottom-left) shown while dragging anything sellable: drop = sell.
 import { SELL_HERO, SELL_SPELL, itemSellValue } from '../../../core/constants.ts';
+import { meOf } from '../../me.ts';
 import { useGame } from '../../store.ts';
 import { heroDef, itemDef, spellDef } from '../defs.ts';
 import { useDragState, useDrop, type DragPayload } from '../dnd.ts';
@@ -13,7 +14,7 @@ interface Quote {
 }
 
 function quote(p: DragPayload): Quote | null {
-  const me = useGame.getState().players[0]!;
+  const me = meOf(useGame.getState());
   switch (p.kind) {
     case 'spellInv': {
       const id = me.spellInventory[p.idx];
@@ -46,7 +47,7 @@ function quote(p: DragPayload): Quote | null {
 export function sellPayload(p: DragPayload) {
   const g = useGame.getState();
   if (g.phase !== 'prep') return;
-  const me = () => useGame.getState().players[0]!;
+  const me = () => meOf(useGame.getState());
   switch (p.kind) {
     case 'spellInv':
       g.sellSpell(p.idx);

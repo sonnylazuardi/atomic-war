@@ -1,8 +1,10 @@
 import type { PlayerState } from '../../core/types.ts';
+import { useSelfId } from '../me.ts';
 import { lordDef } from './defs.ts';
 import { LordTip, tip } from './Tooltip.tsx';
 
 export function Standings({ players, highlight = [] }: { players: PlayerState[]; highlight?: number[] }) {
+  const selfId = useSelfId();
   const sorted = [...players].sort((a, b) => {
     if (a.alive !== b.alive) return a.alive ? -1 : 1;
     if (a.alive) return b.hp - a.hp;
@@ -18,7 +20,7 @@ export function Standings({ players, highlight = [] }: { players: PlayerState[];
           return (
             <li
               key={p.id}
-              className={`stand ${p.isHuman ? 'you' : ''} ${p.alive ? '' : 'dead'} ${highlight.includes(p.id) ? 'hl' : ''}`}
+              className={`stand ${p.id === selfId ? 'you' : ''} ${p.alive ? '' : 'dead'} ${highlight.includes(p.id) ? 'hl' : ''}`}
             >
               <span className="stand-rank">{p.alive ? i + 1 : p.placement ?? '–'}</span>
               <span className="stand-lord" style={{ borderColor: lord?.color }} {...(p.lordId ? tip(() => <LordTip id={p.lordId!} />) : {})}>
@@ -27,7 +29,7 @@ export function Standings({ players, highlight = [] }: { players: PlayerState[];
               <div className="stand-main">
                 <div className="stand-name">
                   <span>{p.name}</span>
-                  {p.isHuman && <em className="you-tag">you</em>}
+                  {p.id === selfId && <em className="you-tag">you</em>}
                   {p.streak !== 0 && p.alive && (
                     <span className={`streak ${p.streak > 0 ? 'win' : 'loss'}`}>
                       {p.streak > 0 ? '🔥' : '❄'}

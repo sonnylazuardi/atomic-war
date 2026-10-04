@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import { hideTip, TooltipLayer } from './components/Tooltip.tsx';
 import { LogToasts } from './components/LogToasts.tsx';
 import { useLayoutMode } from './components/hud/layout.ts';
@@ -6,6 +6,13 @@ import { Gallery } from './screens/Gallery.tsx';
 import { LordSelect } from './screens/LordSelect.tsx';
 import { Play } from './screens/Play.tsx';
 import { useGame } from './store.ts';
+import { isOnlineMode, useMode } from './mode.ts';
+import { bootOnline } from '../net/session.ts';
+import { ConnBadge } from './screens/online/Shell.tsx';
+import { Rooms } from './screens/online/Rooms.tsx';
+import { SignIn } from './screens/online/SignIn.tsx';
+import { Title } from './screens/online/Title.tsx';
+import { WaitingRoom } from './screens/online/WaitingRoom.tsx';
 
 /** Logical stage sizes: desktop 1366x768; landscape phones get a smaller stage so the HUD is less tiny. */
 const STAGES = { desktop: [1366, 768], compact: [1100, 620] } as const;
@@ -31,18 +38,18 @@ function useStage(kind: keyof typeof STAGES) {
 
 let started = false;
 
-function Game() {
+function Game({ online = false }: { online?: boolean }) {
   const phase = useGame((s) => s.phase);
   const mode = useLayoutMode();
   const stage = useStage(mode === 'compact' ? 'compact' : 'desktop');
 
   useEffect(() => {
-    if (started) return;
+    if (online || started) return;
     started = true;
     const raw = new URLSearchParams(location.search).get('seed');
     const seed = raw !== null && raw !== '' && Number.isFinite(Number(raw)) ? Number(raw) : undefined;
     useGame.getState().newGame?.(seed);
-  }, []);
+  }, [online]);
 
   let screen;
   switch (phase) {
@@ -88,7 +95,60 @@ function Game() {
   );
 }
 
+/** Title / sign-in / rooms / waiting room: real CSS px (responsive), not the scaled game stage. */
+function Lobby({ children }: { children: ReactNode }) {
+  return (
+    <div className="viewport lobby" onMouseDown={hideTip}>
+      {children}
+    </div>
+  );
+}
+
 export function App() {
+  useEffect(bootOnline, []);
+  const mode = useMode((s) => s.mode);
   const gallery = new URLSearchParams(location.search).has('gallery');
-  return gallery ? <Gallery /> : <Game />;
+  if (gallery) return <Gallery />;
+  let body: ReactNode;
+  switch (mode) {
+    case 'offline':
+      return <Game />;
+    case 'online-game':
+      body = <Game online />;
+      break;
+    case 'title':
+      body = (
+        <Lobby>
+          <Title />
+        </Lobby>
+      );
+      break;
+    case 'online-auth':
+      body = (
+        <Lobby>
+          <SignIn />
+        </Lobby>
+      );
+      break;
+    case 'online-rooms':
+      body = (
+        <Lobby>
+          <Rooms />
+        </Lobby>
+      );
+      break;
+    case 'online-room':
+      body = (
+        <Lobby>
+          <WaitingRoom />
+        </Lobby>
+      );
+      break;
+  }
+  return (
+    <>
+      {body}
+      {isOnlineMode(mode) && mode !== 'online-auth' && mode !== 'online-rooms' && <ConnBadge inGame={mode === 'online-game'} />}
+    </>
+  );
 }

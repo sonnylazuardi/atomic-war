@@ -2,12 +2,13 @@
 import { lordActiveAvailable } from '../../../core/game/lords.ts';
 import { HERO_KITS } from '../../../core/ids.ts';
 import type { OwnedHero, SpellId } from '../../../core/types.ts';
+import { meOf } from '../../me.ts';
 import { useGame } from '../../store.ts';
 import { lordDef, spellDef } from '../defs.ts';
 import type { DragPayload } from '../dnd.ts';
 import { useUi } from '../uiState.ts';
 
-export const me = () => useGame.getState().players[0]!;
+export const me = () => meOf(useGame.getState());
 export const isPrep = () => useGame.getState().phase === 'prep';
 
 /** Kit spells (Q/W/E/R) are innate: replacing or removing one destroys it. */
@@ -55,7 +56,7 @@ export function safe<T>(fn: () => T, fallback: T): T {
 export function clickHero(uid: string | null) {
   const ui = useUi.getState();
   const g = useGame.getState();
-  const h = uid ? g.players[0]!.heroes.find((x) => x.uid === uid) : undefined;
+  const h = uid ? meOf(g).heroes.find((x) => x.uid === uid) : undefined;
   if (!h) {
     ui.select(null);
     return;
@@ -78,7 +79,7 @@ export function clickHero(uid: string | null) {
 export function dropOnHero(p: DragPayload, uid: string) {
   const g = useGame.getState();
   if (g.phase !== 'prep') return;
-  const h = g.players[0]!.heroes.find((x) => x.uid === uid);
+  const h = meOf(g).heroes.find((x) => x.uid === uid);
   if (!h) return;
   if (p.kind === 'spellInv') assignSpellSafe(h, firstSpellSlot(h), p.idx);
   else if (p.kind === 'itemInv') g.equipItem(h.uid, firstItemSlot(h), p.idx);
@@ -91,7 +92,7 @@ export function dropOnHero(p: DragPayload, uid: string) {
 /** V key / lord button. */
 export function triggerLord() {
   const g = useGame.getState();
-  const p = g.players[0]!;
+  const p = meOf(g);
   if (g.phase !== 'prep' || !p.lordId) return;
   const l = lordDef(p.lordId);
   if (l.kind !== 'active') return;

@@ -4,12 +4,12 @@ import { ITEMS } from '../data/items.ts';
 import { addLevels } from './lords.ts';
 import { SPELLS } from '../data/spells.ts';
 import type { BoardSlot, OwnedHero, PlayerState, SpellId } from '../types.ts';
-import { boardCount, canBench, fail, findHero, heroName, isInnate, log, pure, slotFree, validSlot, type GS } from './util.ts';
+import { say, boardCount, canBench, fail, findHero, heroName, isInnate, pure, slotFree, validSlot, type GS } from './util.ts';
 
 /** Take a spell out of a hero slot: bought spells go back to the inventory, innate (kit) spells are destroyed. */
 function releaseSpell(s: GS, p: PlayerState, h: OwnedHero, sp: SpellId, verb: string) {
   if (isInnate(h, sp)) {
-    if (p.isHuman) log(s, `${SPELLS[sp]?.name ?? sp} was ${verb} (innate spells are lost).`);
+    if (p.isHuman) say(s, p, `${SPELLS[sp]?.name ?? sp} was ${verb} (innate spells are lost).`);
   } else {
     p.spellInventory.push(sp);
   }
@@ -37,7 +37,7 @@ export function upgradeHeroM(s: GS, pid: number, uid: string) {
   }
   h.pendingUpgrades--;
   addLevels(h, LEVELS_PER_UPGRADE);
-  if (p.isHuman) log(s, `${heroName(h.heroId)} is now level ${h.level}.`);
+  if (p.isHuman) say(s, p, `${heroName(h.heroId)} is now level ${h.level}.`);
 }
 
 export function sellHeroM(s: GS, pid: number, uid: string) {
@@ -50,7 +50,7 @@ export function sellHeroM(s: GS, pid: number, uid: string) {
   for (const it of h.items) if (it) p.itemInventory.push(it);
   p.heroes.splice(idx, 1);
   p.coins += SELL_HERO;
-  if (p.isHuman) log(s, `Sold ${heroName(h.heroId)} for ${SELL_HERO}.`);
+  if (p.isHuman) say(s, p, `Sold ${heroName(h.heroId)} for ${SELL_HERO}.`);
 }
 
 export function sellSpellM(s: GS, pid: number, invIdx: number) {

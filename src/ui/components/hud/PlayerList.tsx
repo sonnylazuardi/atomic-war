@@ -1,3 +1,4 @@
+import { useSelfId } from '../../me.ts';
 import { useGame } from '../../store.ts';
 import { lordDef } from '../defs.ts';
 import { LordTip, tip } from '../Tooltip.tsx';
@@ -6,6 +7,7 @@ import { LordTip, tip } from '../Tooltip.tsx';
 export function PlayerList({ opponent }: { opponent: number | null }) {
   const players = useGame((s) => s.players);
   const phase = useGame((s) => s.phase);
+  const selfId = useSelfId();
   const sorted = [...players].sort((a, b) => {
     if (a.alive !== b.alive) return a.alive ? -1 : 1;
     if (a.alive) return b.hp - a.hp || a.id - b.id;
@@ -20,7 +22,7 @@ export function PlayerList({ opponent }: { opponent: number | null }) {
         return (
           <div
             key={p.id}
-            className={`hp-row ${p.isHuman ? 'you' : ''} ${p.alive ? '' : 'dead'} ${vs ? 'vs' : ''}`}
+            className={`hp-row ${p.id === selfId ? 'you' : ''} ${p.alive ? '' : 'dead'} ${vs ? 'vs' : ''}`}
             {...(p.lordId ? tip(() => <LordTip id={p.lordId!} />) : {})}
           >
             <div className="hp-port" style={{ ['--lord-c' as string]: lord?.color ?? '#666' }}>
@@ -42,7 +44,7 @@ export function PlayerList({ opponent }: { opponent: number | null }) {
                 <div className="bar hp-bar">
                   <div style={{ width: `${pct * 100}%` }} />
                 </div>
-                <span className="hp-num" {...(p.isHuman ? { 'data-testid': 'player-hp' } : {})}>
+                <span className="hp-num" {...(p.id === selfId ? { 'data-testid': 'player-hp' } : {})}>
                   {Math.max(0, Math.ceil(p.hp))}
                 </span>
               </div>

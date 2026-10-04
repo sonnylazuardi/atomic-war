@@ -1,9 +1,12 @@
 import { Standings } from '../components/Standings.tsx';
+import { backToRooms, useNet } from '../../net/session.ts';
+import { meOf } from '../me.ts';
 import { useGame } from '../store.ts';
 
 export function GameOver() {
   const g = useGame();
-  const me = g.players[0]!;
+  const online = useNet((s) => s.inGame);
+  const me = meOf(g);
   const place = me.placement ?? (me.alive ? 1 : 8);
   const winner = g.players.find((p) => p.placement === 1) ?? g.players.find((p) => p.alive);
   const won = place === 1;
@@ -17,9 +20,15 @@ export function GameOver() {
           {winner && !won && <div className="go-winner">Winner: {winner.name}</div>}
           <div className="go-round">Survived {g.round} rounds</div>
         </div>
-        <button className="btn btn-ready big" data-testid="new-game" onClick={() => g.newGame()}>
-          New Game
-        </button>
+        {online ? (
+          <button className="btn btn-ready big" data-testid="back-to-rooms" onClick={backToRooms}>
+            Back to rooms
+          </button>
+        ) : (
+          <button className="btn btn-ready big" data-testid="new-game" onClick={() => g.newGame()}>
+            New Game
+          </button>
+        )}
       </div>
       <Standings players={g.players} />
     </div>

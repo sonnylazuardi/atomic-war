@@ -46,9 +46,18 @@ export function log(s: GameState, msg: string) {
   if (s.log.length > MAX_LOG) s.log.splice(0, s.log.length - MAX_LOG);
 }
 
+/** A message meant for one player: online it goes to that player's private log (others never see
+ *  it); offline it is the shared log, which only the single human reads. */
+export function say(s: GameState, p: PlayerState, msg: string) {
+  if (!s.online) return log(s, msg);
+  const l = (p.log ??= []);
+  l.push(msg);
+  if (l.length > MAX_LOG) l.splice(0, l.length - MAX_LOG);
+}
+
 /** Log only for the human player (bots fail silently). */
 export function fail(s: GameState, p: PlayerState | undefined, msg: string) {
-  if (p?.isHuman) log(s, msg);
+  if (p?.isHuman) say(s, p, msg);
 }
 
 export function withRng<T>(s: GameState, fn: (rng: Rng) => T): T {
