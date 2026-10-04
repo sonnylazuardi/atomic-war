@@ -1,8 +1,13 @@
 // Spell definitions — owned by content agent.
 // Magnitudes are at hero level 1; scaled by 1 + levelScaling * (level - 1).
+import type { BaseSpellId } from '../ids.ts';
 import type { SpellDef, SpellId } from '../types.ts';
+import { KIT_SPELLS_A } from './kitA.ts';
+import { KIT_SPELLS_B } from './kitB.ts';
+import { KIT_SPELLS_C } from './kitC.ts';
 
-export const SPELLS: Record<SpellId, SpellDef> = {
+/** hero signatures + original shop spells; the hero-kit spells live in kitA/B/C.ts */
+const BASE_SPELLS: Record<BaseSpellId, SpellDef> = {
   // ------------------------------------------------------------ signatures
   flesh_heap: {
     id: 'flesh_heap',
@@ -24,6 +29,21 @@ export const SPELLS: Record<SpellId, SpellDef> = {
       { t: 'stat', stat: 'hpRegen', value: 3 },
     ],
     levelScaling: 0.05,
+    aghanim: {
+      description: 'Kills grant +4 STR (doubled). Rotting flesh: when attacked, 35% chance to deal 40 magical damage within 140.',
+      patch: {
+        passives: [
+          { t: 'on_kill_stack', attr: 'str', amount: 4 },
+          { t: 'stat', stat: 'hp', value: 150 },
+          { t: 'stat', stat: 'hpRegen', value: 3 },
+          {
+            t: 'on_attacked',
+            chance: 0.35,
+            effects: [{ t: 'damage', amount: 40, dmgType: 'magical', area: { shape: 'circle', radius: 140, center: 'caster' } }],
+          },
+        ],
+      },
+    },
     vfx: { kind: 'buff', duration: 0.8, color: '#9b2d2d' },
   },
   counter_helix: {
@@ -48,6 +68,18 @@ export const SPELLS: Record<SpellId, SpellDef> = {
       },
     ],
     levelScaling: 0.07,
+    aghanim: {
+      description: 'Helix triggers 30% of the time, deals 120 pure damage and spins in a 200 radius.',
+      patch: {
+        passives: [
+          {
+            t: 'on_attacked',
+            chance: 0.3,
+            effects: [{ t: 'damage', amount: 120, dmgType: 'pure', area: { shape: 'circle', radius: 200, center: 'caster' } }],
+          },
+        ],
+      },
+    },
     vfx: { kind: 'proc', duration: 0.5, color: '#d43a2a' },
   },
   enrage: {
@@ -69,6 +101,16 @@ export const SPELLS: Record<SpellId, SpellDef> = {
       { t: 'buff', stat: 'damagePct', value: 50, duration: 6 },
     ],
     levelScaling: 0.02,
+    aghanim: {
+      description: 'Cooldown 14s and Enrage lasts 9s.',
+      patch: {
+        cooldown: 14,
+        effects: [
+          { t: 'buff', stat: 'damageReduction', value: 60, duration: 9 },
+          { t: 'buff', stat: 'damagePct', value: 50, duration: 9 },
+        ],
+      },
+    },
     vfx: { kind: 'buff', duration: 1.2, color: '#ff5a1f' },
   },
   essence_shift: {
@@ -90,6 +132,15 @@ export const SPELLS: Record<SpellId, SpellDef> = {
       { t: 'on_kill_stack', attr: 'agi', amount: 1 },
     ],
     levelScaling: 0.04,
+    aghanim: {
+      description: 'Each hit steals 4 AGI for 20s; kills permanently grant +2 AGI.',
+      patch: {
+        passives: [
+          { t: 'on_hit_steal', attr: 'agi', amount: 4, duration: 20 },
+          { t: 'on_kill_stack', attr: 'agi', amount: 2 },
+        ],
+      },
+    },
     vfx: { kind: 'proc', duration: 0.4, color: '#4fc3c7' },
   },
   coup_de_grace: {
@@ -108,6 +159,10 @@ export const SPELLS: Record<SpellId, SpellDef> = {
     effects: [],
     passives: [{ t: 'crit', chance: 0.15, mult: 2.5 }],
     levelScaling: 0.04,
+    aghanim: {
+      description: '25% chance to crit for 275%.',
+      patch: { passives: [{ t: 'crit', chance: 0.25, mult: 2.75 }] },
+    },
     vfx: { kind: 'proc', duration: 0.5, color: '#c21f3a' },
   },
   omnislash: {
@@ -126,6 +181,10 @@ export const SPELLS: Record<SpellId, SpellDef> = {
     ai: { minBattleTime: 2 },
     effects: [{ t: 'omnislash', jumps: 6, interval: 0.35, attackMult: 1 }],
     levelScaling: 0.04,
+    aghanim: {
+      description: '10 slashes, 0.3s apart; cooldown 28s.',
+      patch: { cooldown: 28, effects: [{ t: 'omnislash', jumps: 10, interval: 0.3, attackMult: 1 }] },
+    },
     vfx: { kind: 'chain', duration: 1.2, color: '#ff8c32' },
   },
   glaives_of_wisdom: {
@@ -147,6 +206,29 @@ export const SPELLS: Record<SpellId, SpellDef> = {
       { t: 'on_kill_stack', attr: 'int', amount: 2 },
     ],
     levelScaling: 0.04,
+    aghanim: {
+      description: 'Bonus damage 60% of INT, glaives bounce to a 2nd enemy, kills grant +3 INT.',
+      patch: {
+        passives: [
+          { t: 'bonus_attack_damage', dmgType: 'pure', attr: 'int', mult: 0.6 },
+          { t: 'on_kill_stack', attr: 'int', amount: 3 },
+          {
+            t: 'on_attack',
+            chance: 1,
+            effects: [
+              {
+                t: 'bounce',
+                count: 1,
+                range: 250,
+                falloff: 1,
+                allowRepeat: false,
+                effects: [{ t: 'damage', amount: 10, dmgType: 'pure', scaleAttr: 'int', attrMult: 0.6 }],
+              },
+            ],
+          },
+        ],
+      },
+    },
     vfx: { kind: 'projectile', duration: 0.4, color: '#e6d36a' },
   },
   laguna_blade: {
@@ -165,6 +247,21 @@ export const SPELLS: Record<SpellId, SpellDef> = {
     ai: { minBattleTime: 1 },
     effects: [{ t: 'damage', amount: 400, dmgType: 'magical' }],
     levelScaling: 0.06,
+    aghanim: {
+      description: 'Deals pure damage and arcs to a 2nd enemy.',
+      patch: {
+        effects: [
+          {
+            t: 'bounce',
+            count: 2,
+            range: 300,
+            falloff: 1,
+            allowRepeat: false,
+            effects: [{ t: 'damage', amount: 400, dmgType: 'pure' }],
+          },
+        ],
+      },
+    },
     vfx: { kind: 'line', duration: 0.7, color: '#ff4d1a' },
   },
   thundergods_wrath: {
@@ -183,6 +280,15 @@ export const SPELLS: Record<SpellId, SpellDef> = {
     ai: { minBattleTime: 2 },
     effects: [{ t: 'damage', amount: 220, dmgType: 'magical' }],
     levelScaling: 0.06,
+    aghanim: {
+      description: 'Deals 280 damage and stuns every enemy for 0.8s.',
+      patch: {
+        effects: [
+          { t: 'damage', amount: 280, dmgType: 'magical' },
+          { t: 'stun', duration: 0.8 },
+        ],
+      },
+    },
     vfx: { kind: 'at_target', duration: 0.8, color: '#7fd8ff' },
   },
   black_hole: {
@@ -217,6 +323,28 @@ export const SPELLS: Record<SpellId, SpellDef> = {
       },
     ],
     levelScaling: 0.06,
+    aghanim: {
+      description: 'Radius 240, lasts 5s, 90 pure damage per second.',
+      patch: {
+        aoeRadius: 240,
+        effects: [
+          {
+            t: 'zone',
+            radius: 240,
+            duration: 5,
+            tickEvery: 0.5,
+            at: 'target',
+            affects: 'enemies',
+            channel: true,
+            pullStrength: 80,
+            effects: [
+              { t: 'stun', duration: 0.6 },
+              { t: 'damage', amount: 45, dmgType: 'pure' },
+            ],
+          },
+        ],
+      },
+    },
     vfx: { kind: 'zone', duration: 4, color: '#6a3fbf' },
   },
   laser: {
@@ -237,6 +365,24 @@ export const SPELLS: Record<SpellId, SpellDef> = {
       { t: 'blind', pct: 70, duration: 3 },
     ],
     levelScaling: 0.06,
+    aghanim: {
+      description: 'Laser refracts to 3 enemies, each taking 160 pure damage and blinded.',
+      patch: {
+        effects: [
+          {
+            t: 'bounce',
+            count: 3,
+            range: 300,
+            falloff: 1,
+            allowRepeat: false,
+            effects: [
+              { t: 'damage', amount: 160, dmgType: 'pure' },
+              { t: 'blind', pct: 70, duration: 3 },
+            ],
+          },
+        ],
+      },
+    },
     vfx: { kind: 'line', duration: 0.5, color: '#ff2a2a' },
   },
   split_shot: {
@@ -255,6 +401,10 @@ export const SPELLS: Record<SpellId, SpellDef> = {
     effects: [],
     passives: [{ t: 'split_shot', extraTargets: 2, dmgPct: 70 }],
     levelScaling: 0.04,
+    aghanim: {
+      description: 'Splits into 4 extra arrows at 90% damage.',
+      patch: { passives: [{ t: 'split_shot', extraTargets: 4, dmgPct: 90 }] },
+    },
     vfx: { kind: 'projectile', duration: 0.4, color: '#58c48a' },
   },
   marksmanship: {
@@ -278,6 +428,18 @@ export const SPELLS: Record<SpellId, SpellDef> = {
       { t: 'custom', id: 'true_strike' },
     ],
     levelScaling: 0.06,
+    aghanim: {
+      description: '+30 AGI, +40 range, and each arrow splits to 1 extra enemy for 50% damage.',
+      patch: {
+        passives: [
+          { t: 'stat', stat: 'agi', value: 30 },
+          { t: 'stat', stat: 'attackRange', value: 40 },
+          { t: 'evasion', pct: 10 },
+          { t: 'custom', id: 'true_strike' },
+          { t: 'split_shot', extraTargets: 1, dmgPct: 50 },
+        ],
+      },
+    },
     vfx: { kind: 'buff', duration: 0.6, color: '#9fdcff' },
   },
   assassinate: {
@@ -305,6 +467,22 @@ export const SPELLS: Record<SpellId, SpellDef> = {
       },
     ],
     levelScaling: 0.06,
+    aghanim: {
+      description: 'Bullet explodes in a 150 radius around the target; cooldown 16s.',
+      patch: {
+        cooldown: 16,
+        effects: [
+          {
+            t: 'projectile',
+            speed: 650,
+            effects: [
+              { t: 'damage', amount: 300, dmgType: 'magical', area: { shape: 'circle', radius: 150, center: 'target' } },
+              { t: 'stun', duration: 0.5, area: { shape: 'circle', radius: 150, center: 'target' } },
+            ],
+          },
+        ],
+      },
+    },
     vfx: { kind: 'projectile', duration: 0.8, color: '#ffcc33' },
   },
   freezing_field: {
@@ -339,6 +517,29 @@ export const SPELLS: Record<SpellId, SpellDef> = {
       },
     ],
     levelScaling: 0.06,
+    aghanim: {
+      description: 'Radius 300 and frostbites nearby enemies (1.5s root) on cast.',
+      patch: {
+        aoeRadius: 300,
+        effects: [
+          { t: 'root', duration: 1.5, area: { shape: 'circle', radius: 300, center: 'caster' } },
+          {
+            t: 'zone',
+            radius: 300,
+            duration: 5,
+            tickEvery: 0.5,
+            at: 'caster',
+            follow: true,
+            affects: 'enemies',
+            channel: true,
+            effects: [
+              { t: 'damage', amount: 45, dmgType: 'magical' },
+              { t: 'slow', pct: 40, duration: 1 },
+            ],
+          },
+        ],
+      },
+    },
     vfx: { kind: 'zone', duration: 5, color: '#a8e0ff' },
   },
   shallow_grave: {
@@ -357,7 +558,138 @@ export const SPELLS: Record<SpellId, SpellDef> = {
     ai: { allyHpBelowPct: 35 },
     effects: [{ t: 'grave', duration: 4 }],
     levelScaling: 0.03,
+    aghanim: {
+      description: 'Graves every ally at once.',
+      patch: { target: 'all_allies', effects: [{ t: 'grave', duration: 4 }] },
+    },
     vfx: { kind: 'buff', duration: 1.2, color: '#b06be0' },
+  },
+
+  elder_dragon_form: {
+    id: 'elder_dragon_form',
+    name: 'Elder Dragon Form',
+    glyph: '🐲',
+    description: 'Becomes a dragon for 10s: +280 attack range, +40% damage, +4 armor. Passive: attacks splash 40 magical damage in a 120 radius.',
+    kind: 'active',
+    ultimate: true,
+    stars: 4,
+    manaCost: 150,
+    cooldown: 25,
+    castRange: 0,
+    castPoint: 0.3,
+    target: 'self',
+    ai: { minBattleTime: 1 },
+    effects: [
+      { t: 'buff', stat: 'attackRange', value: 280, duration: 10 },
+      { t: 'buff', stat: 'damagePct', value: 40, duration: 10 },
+      { t: 'buff', stat: 'armor', value: 4, duration: 10 },
+    ],
+    passives: [
+      {
+        t: 'on_attack',
+        chance: 1,
+        effects: [{ t: 'damage', amount: 40, dmgType: 'magical', area: { shape: 'circle', radius: 120, center: 'target' } }],
+      },
+    ],
+    levelScaling: 0.05,
+    aghanim: {
+      description: 'Black Dragon: 14s, +60% damage, splash 70 magical in a 180 radius and slows 25%.',
+      patch: {
+        effects: [
+          { t: 'buff', stat: 'attackRange', value: 280, duration: 14 },
+          { t: 'buff', stat: 'damagePct', value: 60, duration: 14 },
+          { t: 'buff', stat: 'armor', value: 6, duration: 14 },
+        ],
+        passives: [
+          {
+            t: 'on_attack',
+            chance: 1,
+            effects: [
+              { t: 'damage', amount: 70, dmgType: 'magical', area: { shape: 'circle', radius: 180, center: 'target' } },
+              { t: 'slow', pct: 25, duration: 1.5, area: { shape: 'circle', radius: 180, center: 'target' } },
+            ],
+          },
+        ],
+      },
+    },
+    vfx: { kind: 'buff', duration: 1.2, color: '#e8562a' },
+  },
+  focus_fire: {
+    id: 'focus_fire',
+    name: 'Focus Fire',
+    glyph: '🌬️',
+    description: 'For 6s Windranger gains +300 attack speed but deals 25% less damage, locking onto her target.',
+    kind: 'active',
+    ultimate: true,
+    stars: 5,
+    manaCost: 150,
+    cooldown: 30,
+    castRange: 0,
+    castPoint: 0.1,
+    target: 'self',
+    ai: { minBattleTime: 1 },
+    effects: [
+      { t: 'buff', stat: 'attackSpeed', value: 300, duration: 6 },
+      { t: 'buff', stat: 'damagePct', value: -25, duration: 6 },
+    ],
+    levelScaling: 0.04,
+    aghanim: {
+      description: 'Cooldown 12s and no damage penalty.',
+      patch: { cooldown: 12, effects: [{ t: 'buff', stat: 'attackSpeed', value: 300, duration: 6 }] },
+    },
+    vfx: { kind: 'buff', duration: 1.0, color: '#9be36a' },
+  },
+  macropyre: {
+    id: 'macropyre',
+    name: 'Macropyre',
+    glyph: '🔥',
+    description: 'Breathes a 6s field of fire (radius 170): 50 magical damage per second and 20% slow.',
+    kind: 'active',
+    ultimate: true,
+    stars: 4,
+    manaCost: 200,
+    cooldown: 30,
+    castRange: 400,
+    castPoint: 0.4,
+    target: 'enemy_cluster',
+    aoeRadius: 170,
+    ai: { minEnemiesInRange: 2 },
+    effects: [
+      {
+        t: 'zone',
+        radius: 170,
+        duration: 6,
+        tickEvery: 0.5,
+        at: 'target',
+        affects: 'enemies',
+        effects: [
+          { t: 'damage', amount: 25, dmgType: 'magical' },
+          { t: 'slow', pct: 20, duration: 0.6 },
+        ],
+      },
+    ],
+    levelScaling: 0.06,
+    aghanim: {
+      description: 'Radius 230, burns 10s, deals pure damage.',
+      patch: {
+        aoeRadius: 230,
+        effects: [
+          {
+            t: 'zone',
+            radius: 230,
+            duration: 10,
+            tickEvery: 0.5,
+            at: 'target',
+            affects: 'enemies',
+            effects: [
+              { t: 'damage', amount: 30, dmgType: 'pure' },
+              { t: 'slow', pct: 20, duration: 0.6 },
+            ],
+          },
+        ],
+      },
+    },
+    vfx: { kind: 'zone', duration: 6, color: '#ff6a1a' },
   },
 
   // ------------------------------------------------------------ shop spells
@@ -395,6 +727,15 @@ export const SPELLS: Record<SpellId, SpellDef> = {
     ai: { minBattleTime: 2 },
     effects: [{ t: 'silence', duration: 4 }],
     levelScaling: 0.03,
+    aghanim: {
+      description: 'Silences for 6s and burns 60 mana from every enemy.',
+      patch: {
+        effects: [
+          { t: 'silence', duration: 6 },
+          { t: 'mana', amount: -60 },
+        ],
+      },
+    },
     vfx: { kind: 'at_target', duration: 1.0, color: '#8e6bd6' },
   },
   dragon_slave: {
@@ -681,6 +1022,28 @@ export const SPELLS: Record<SpellId, SpellDef> = {
       { t: 'dot', dps: 15, duration: 6, dmgType: 'magical' },
     ],
     levelScaling: 0.06,
+    aghanim: {
+      description: 'Radius 180, 70 damage per second and 35% slow.',
+      patch: {
+        aoeRadius: 180,
+        effects: [
+          {
+            t: 'zone',
+            radius: 180,
+            duration: 6,
+            tickEvery: 0.5,
+            at: 'caster',
+            follow: true,
+            affects: 'enemies',
+            effects: [
+              { t: 'damage', amount: 35, dmgType: 'magical' },
+              { t: 'slow', pct: 35, duration: 0.6 },
+            ],
+          },
+          { t: 'dot', dps: 15, duration: 6, dmgType: 'magical' },
+        ],
+      },
+    },
     vfx: { kind: 'zone', duration: 6, color: '#6b8e23' },
   },
   meat_hook: {
@@ -707,6 +1070,22 @@ export const SPELLS: Record<SpellId, SpellDef> = {
       },
     ],
     levelScaling: 0.06,
+    aghanim: {
+      description: 'Cooldown 8s and 260 pure damage.',
+      patch: {
+        cooldown: 8,
+        effects: [
+          {
+            t: 'projectile',
+            speed: 900,
+            effects: [
+              { t: 'damage', amount: 260, dmgType: 'pure' },
+              { t: 'pull', distance: 300 },
+            ],
+          },
+        ],
+      },
+    },
     vfx: { kind: 'projectile', duration: 0.8, color: '#8a6d4a' },
   },
   chain_frost: {
@@ -737,6 +1116,26 @@ export const SPELLS: Record<SpellId, SpellDef> = {
       },
     ],
     levelScaling: 0.06,
+    aghanim: {
+      description: 'Bounces 14 times with 350 range.',
+      patch: {
+        effects: [
+          {
+            t: 'bounce',
+            count: 14,
+            range: 350,
+            falloff: 1,
+            allowRepeat: true,
+            effects: [
+              { t: 'damage', amount: 110, dmgType: 'magical' },
+              { t: 'slow', pct: 40, duration: 2 },
+            ],
+          },
+        ],
+      },
+    },
     vfx: { kind: 'chain', duration: 1.2, color: '#6fc3ff' },
   },
 };
+
+export const SPELLS: Record<SpellId, SpellDef> = { ...BASE_SPELLS, ...KIT_SPELLS_A, ...KIT_SPELLS_B, ...KIT_SPELLS_C };

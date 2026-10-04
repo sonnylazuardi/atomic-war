@@ -8,7 +8,11 @@ export const LORD_SELECT_CSS = `
   color: #efe8dc;
   font-family: var(--font-body, system-ui, sans-serif);
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  container: summoner / size;
 }
+.summoner-select button { touch-action: manipulation; }
 .summoner-select .sb-layer { position: absolute; inset: 0; pointer-events: none; }
 .summoner-select .sb-layer.static { contain: strict; will-change: transform; }
 .summoner-select .sb-svg { width: 100%; height: 100%; display: block; }
@@ -195,5 +199,77 @@ export const LORD_SELECT_CSS = `
   font-size: 11px;
   color: rgba(230,220,240,.5);
   letter-spacing: .04em;
+}
+/* ---------- fluid layout: unscaled phones / small parents (desktop 1366x768 stage never matches) */
+@container summoner (max-width: 1000px) or (max-height: 640px) {
+  .sm-content {
+    inset: 0;
+    left: 0;
+    top: 0;
+    width: auto;
+    height: auto;
+    transform: none;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+  }
+  .sm-timer {
+    position: absolute;
+    left: max(10px, env(safe-area-inset-left));
+    top: max(8px, env(safe-area-inset-top));
+    width: 40px;
+    height: 40px;
+    margin: 0;
+  }
+  .sm-timer span { font-size: 16px; }
+  .sm-title { position: static; font-size: 20px; line-height: 40px; height: 40px; flex: none; }
+  .sm-row {
+    position: static;
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 6px;
+    align-content: center;
+    overflow-y: auto;
+    padding: 2px 0;
+  }
+  .sm-card { padding: 0 8px 8px; animation-duration: .35s; }
+  .sm-fig { height: clamp(96px, calc(100cqh - 250px), 170px); margin: 0 -8px; }
+  .sm-fig::before { width: 70%; height: 90%; bottom: 4px; }
+  .sm-name { font-size: 16px; margin: 2px 0 6px; }
+  .sm-ability { display: grid; grid-template-columns: 30px 1fr; column-gap: 7px; row-gap: 4px; align-items: center; }
+  .sm-text { display: contents; }
+  .sm-icon { width: 30px; height: 30px; padding: 2px; border-width: 1px; }
+  .sm-ab-title { font-size: 12px; flex-wrap: wrap; row-gap: 0; line-height: 1.15; }
+  .sm-desc { grid-column: 1 / -1; margin: 0; font-size: 12px; line-height: 1.3; -webkit-line-clamp: 2; }
+  .sm-actions {
+    position: static;
+    transform: none;
+    flex: none;
+    align-self: center;
+    width: min(100%, 420px);
+    padding: 6px 0 max(8px, env(safe-area-inset-bottom));
+  }
+  .sm-btn { height: 46px; font-size: 18px; }
+  .sm-btn.reroll { width: 52px; font-size: 26px; }
+  .sm-btn.start { width: auto; flex: 1; }
+  .sm-hint { display: none; }
+}
+/* phone portrait: 2x2 grid, bigger text */
+@container summoner (max-width: 760px) and (min-height: 560px) {
+  .sm-content { padding-top: max(10px, env(safe-area-inset-top)); }
+  .sm-timer { position: static; align-self: center; width: 46px; height: 46px; }
+  .sm-timer span { font-size: 18px; }
+  .sm-title { font-size: 24px; line-height: 1.2; height: auto; margin: 4px 0 6px; }
+  .sm-row { grid-template-columns: repeat(2, 1fr); gap: 10px 8px; align-content: center; }
+  .sm-fig { height: clamp(112px, calc(50cqh - 250px), 175px); }
+  .sm-name { font-size: 18px; }
+  .sm-ability { grid-template-columns: 34px 1fr; }
+  .sm-icon { width: 34px; height: 34px; }
+  .sm-ab-title { font-size: 13px; }
+  .sm-desc { -webkit-line-clamp: 3; }
+  .sm-btn { height: 54px; font-size: 20px; }
+  .sm-btn.reroll { width: 58px; }
+  .sm-actions { width: 100%; padding-top: 8px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 }
 `;

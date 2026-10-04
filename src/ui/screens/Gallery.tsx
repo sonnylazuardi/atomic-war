@@ -14,7 +14,7 @@ import { signatureVfx } from '../../art/vfx/signatures.ts';
 import { shopSpellVfx } from '../../art/vfx/shopSpells.ts';
 import { getAttackProjectileArt, hasAttackProjectile } from '../../art/attackProjectiles.tsx';
 import { TEAM_COLORS } from '../../art/types.ts';
-import { World } from '../components/World.tsx';
+import { MOBILE_VIEWBOX, World } from '../components/World.tsx';
 import { makeFakeBattle } from '../components/arena/fakeBattle.ts';
 import { GroundLayer } from '../components/world/terrainLayers.tsx';
 import { fakeBattleHeroes, fakeOwnedHero } from '../components/world/demo.ts';
@@ -230,7 +230,7 @@ function HeroRow({ id, t }: { id: HeroId; t: number }) {
   );
 }
 
-function WorldBattleDemo({ side }: { side: Team }) {
+function WorldBattleDemo({ side, mobile = false }: { side: Team; mobile?: boolean }) {
   const [run, setRun] = useState(0);
   const [mode, setMode] = useState<'prep' | 'battle'>('battle');
   const battle = useMemo(() => makeFakeBattle(), [run]);
@@ -244,7 +244,7 @@ function WorldBattleDemo({ side }: { side: Team }) {
       <div className="gal-demo-bar">
         <button
           type="button"
-          data-testid={`world-demo-restart-${side}`}
+          data-testid={`world-demo-restart-${mobile ? 'mobile' : side}`}
           onClick={() => {
             setRun((r) => r + 1);
             setMode('battle');
@@ -257,8 +257,14 @@ function WorldBattleDemo({ side }: { side: Team }) {
           {battle.winner} · onBattleDone {doneCount}×
         </span>
       </div>
-      <div className="gal-world" data-testid={`world-demo-${side}`}>
+      <div
+        className="gal-world"
+        data-testid={`world-demo-${mobile ? 'mobile' : side}`}
+        style={mobile ? { width: 390, maxWidth: '100%', aspectRatio: '390 / 400', margin: '0 auto' } : undefined}
+      >
         <World
+          viewBox={mobile ? MOBILE_VIEWBOX : undefined}
+          fit={mobile ? 'meet' : undefined}
           mode={mode}
           round={3}
           heroes={heroes}
@@ -287,7 +293,7 @@ const PREP_START: OwnedHero[] = [
 ];
 const PREP_EXTRA: HeroId[] = ['axe', 'zeus', 'slark'];
 
-function WorldPrepDemo() {
+function WorldPrepDemo({ mobile = false }: { mobile?: boolean }) {
   const [heroes, setHeroes] = useState<OwnedHero[]>(PREP_START);
   const [sel, setSel] = useState<string | null>(null);
   const [terrain, setTerrain] = useState(0);
@@ -330,8 +336,14 @@ function WorldPrepDemo() {
         </button>
         <span>drag heroes between tiles · selected {sel ?? 'none'}</span>
       </div>
-      <div className="gal-world" data-testid="world-demo-prep">
+      <div
+        className="gal-world"
+        data-testid={mobile ? 'world-demo-prep-mobile' : 'world-demo-prep'}
+        style={mobile ? { width: 390, maxWidth: '100%', aspectRatio: '390 / 400', margin: '0 auto' } : undefined}
+      >
         <World
+          viewBox={mobile ? MOBILE_VIEWBOX : undefined}
+          fit={mobile ? 'meet' : undefined}
           mode="prep"
           round={2}
           heroes={heroes}
@@ -398,6 +410,9 @@ export function Gallery() {
       <WorldBattleDemo side="left" />
       <h2>World demo — battle, human visits (teleport to enemy arena)</h2>
       <WorldBattleDemo side="right" />
+      <h2>World demo — mobile crop (390px box, MOBILE_VIEWBOX, fit meet)</h2>
+      <WorldBattleDemo side="right" mobile />
+      <WorldPrepDemo mobile />
       <h2>World demo — preparation</h2>
       <WorldPrepDemo />
       <h2>Terrains</h2>

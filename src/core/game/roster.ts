@@ -1,8 +1,18 @@
 // Roster management: upgrade, sell, spells, items, placement.
 import { LEVELS_PER_UPGRADE, MAX_HERO_LEVEL, SELL_HERO, SELL_ITEM, SELL_SPELL, boardCap } from '../constants.ts';
-import type { BoardSlot } from '../types.ts';
 import { addLevels } from './lords.ts';
-import { boardCount, canBench, fail, findHero, heroName, log, pure, slotFree, validSlot, type GS } from './util.ts';
+import { SPELLS } from '../data/spells.ts';
+import type { BoardSlot, OwnedHero, PlayerState, SpellId } from '../types.ts';
+import { boardCount, canBench, fail, findHero, heroName, isInnate, log, pure, slotFree, validSlot, type GS } from './util.ts';
+
+/** Take a spell out of a hero slot: bought spells go back to the inventory, innate (kit) spells are destroyed. */
+function releaseSpell(s: GS, p: PlayerState, h: OwnedHero, sp: SpellId, verb: string) {
+  if (isInnate(h, sp)) {
+    if (p.isHuman) log(s, `${SPELLS[sp]?.name ?? sp} was ${verb} (innate spells are lost).`);
+  } else {
+    p.spellInventory.push(sp);
+  }
+}
 
 function prep(s: GS, pid: number) {
   const p = s.players[pid];
@@ -35,10 +45,7 @@ export function sellHeroM(s: GS, pid: number, uid: string) {
   const idx = p.heroes.findIndex((h) => h.uid === uid);
   if (idx < 0) return fail(s, p, 'No such hero.');
   const h = p.heroes[idx]!;
-  for (let i = 1; i < h.spells.length; i++) {
-    const sp = h.spells[i];
-    if (sp) p.spellInventory.push(sp);
-  }
+  for (const sp of h.spells) if (sp && !isInnate(h, sp)) p.spellInventory.push(sp);
   for (const it of h.items) if (it) p.itemInventory.push(it);
   p.heroes.splice(idx, 1);
   p.coins += SELL_HERO;
@@ -66,14 +73,14 @@ export function assignSpellM(s: GS, pid: number, uid: string, slotIdx: number, i
   if (!p) return;
   const h = findHero(p, uid);
   if (!h) return fail(s, p, 'No such hero.');
-  if (slotIdx < 1 || slotIdx >= h.spells.length) return fail(s, p, 'That spell slot is locked.');
+  if (slotIdx < 0 || slotIdx >= h.spells.length) return fail(s, p, 'No such spell slot.');
   const sp = p.spellInventory[invIdx];
   if (!sp) return fail(s, p, 'No such spell.');
   if (h.spells.some((x, i) => x === sp && i !== slotIdx)) return fail(s, p, 'Hero already knows that spell.');
   p.spellInventory.splice(invIdx, 1);
   const prev = h.spells[slotIdx];
-  if (prev) p.spellInventory.push(prev);
   h.spells[slotIdx] = sp;
+  if (prev) releaseSpell(s, p, h, prev, 'replaced');
 }
 
 export function unassignSpellM(s: GS, pid: number, uid: string, slotIdx: number) {
@@ -81,11 +88,11 @@ export function unassignSpellM(s: GS, pid: number, uid: string, slotIdx: number)
   if (!p) return;
   const h = findHero(p, uid);
   if (!h) return fail(s, p, 'No such hero.');
-  if (slotIdx < 1 || slotIdx >= h.spells.length) return fail(s, p, 'Cannot remove that spell.');
+  if (slotIdx < 0 || slotIdx >= h.spells.length) return fail(s, p, 'No such spell slot.');
   const sp = h.spells[slotIdx];
   if (!sp) return;
-  p.spellInventory.push(sp);
   h.spells[slotIdx] = null;
+  releaseSpell(s, p, h, sp, 'removed');
 }
 
 export function swapSpellSlotsM(s: GS, pid: number, uid: string, a: number, b: number) {
@@ -93,7 +100,7 @@ export function swapSpellSlotsM(s: GS, pid: number, uid: string, a: number, b: n
   if (!p) return;
   const h = findHero(p, uid);
   if (!h) return fail(s, p, 'No such hero.');
-  if (a < 1 || b < 1 || a >= h.spells.length || b >= h.spells.length) return fail(s, p, 'Cannot move the signature spell.');
+  if (a < 0 || b < 0 || a >= h.spells.length || b >= h.spells.length) return fail(s, p, 'No such spell slot.');
   [h.spells[a], h.spells[b]] = [h.spells[b]!, h.spells[a]!];
 }
 
@@ -141,7 +148,7 @@ export function placeHeroM(s: GS, pid: number, uid: string, slot: BoardSlot | nu
     return;
   }
   if (h.slot === null && boardCount(p) >= boardCap(s.round)) {
-    return fail(s, p, `Board is full (${boardCap(s.round)} heroes this round).`);
+    return fail(s, p, `Board is full (${boardCap(s.round)} heroes max).`);
   }
   if (!slotFree(p, slot, uid)) return;
   h.slot = { col: slot.col, row: slot.row };

@@ -5,7 +5,8 @@ import { useGame } from '../../store.ts';
 import { ATTR_INFO, CLASS_INFO, fmt, heroDef, safeStats } from '../defs.ts';
 import { HeroPortrait } from '../HeroPortrait.tsx';
 import { useUi } from '../uiState.ts';
-import { canGoToBoard, safe, sendToBoard } from './actions.ts';
+import { safe } from './actions.ts';
+import { ItemSlot, SpellSlot } from './Roster.tsx';
 import { Stars } from './Stars.tsx';
 
 export function UnitCard() {
@@ -62,14 +63,22 @@ export function UnitCard() {
         ))}
       </div>
       {ui.lordTargeting && <div className="unit-hint">Click a hero to target your lord ability</div>}
+      <div className="unit-slots">
+        <div className="unit-slot-row" title="Skills (cast priority left to right)">
+          {hero.spells.map((sp, i) => (
+            <SpellSlot key={i} hero={hero} idx={i} id={sp} prep={prep} />
+          ))}
+        </div>
+        <div className="unit-slot-row" title="Items">
+          {hero.items.map((it, i) => (
+            <ItemSlot key={i} hero={hero} idx={i} id={it} prep={prep} />
+          ))}
+        </div>
+      </div>
       <div className="unit-actions">
-        {hero.slot ? (
-          <button className="btn sm" disabled={!prep} onClick={() => g.placeHero(hero.uid, null)}>
-            To bench
-          </button>
-        ) : (
-          <button className="btn sm" disabled={!prep || !canGoToBoard(me, g.round)} onClick={() => sendToBoard(hero)}>
-            To board
+        {hero.pendingUpgrades > 0 && (
+          <button className="btn sm btn-upgrade" disabled={!prep} onClick={() => g.upgradeHero(hero.uid)}>
+            ⬆ Upgrade
           </button>
         )}
         <button

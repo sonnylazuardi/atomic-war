@@ -37,7 +37,7 @@ export function releaseAttack(w: World, u: Unit, target: Unit): void {
     }
   }
   const fire = (dst: Unit, frac: number, main: boolean) => {
-    if (u.base.ranged) {
+    if (u.base.ranged || u.cur.attackRange > 150) {
       w.projectiles.push({
         id: w.nextId++,
         x: u.x,
@@ -117,7 +117,7 @@ export function resolveAttack(w: World, src: Unit, dst: Unit, frac: number, main
     src.buffs.push({ stat: p.attr, value: p.amount, until, show: false });
     if (dst.alive) dst.buffs.push({ stat: p.attr, value: -p.amount, until, show: false });
   }
-  if (!src.base.ranged && src.cleaves.length) {
+  if (!src.base.ranged && src.cur.attackRange <= 150 && src.cleaves.length) {
     for (const pe of src.cleaves) {
       const p = pe.p as Extract<PassiveDef, { t: 'custom' }>;
       const pct = asPct(p.params?.pct ?? 40);

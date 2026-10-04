@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import {
   BENCH_SIZE,
   HERO_COST,
+  ITEM_SLOTS,
+  SPELL_SLOTS,
   HERO_OFFERS,
   MAX_SHOP_LEVEL,
   TAVERN_ODDS,
@@ -16,7 +18,7 @@ import {
   offersForShopLevel,
   shopUpgradeCost,
 } from '../src/core/constants.ts';
-import { HERO_IDS, SIGNATURE_SPELLS } from '../src/core/ids.ts';
+import { HERO_IDS, HERO_KITS } from '../src/core/ids.ts';
 import { createRng } from '../src/core/rng.ts';
 import { ITEMS } from '../src/core/data/items.ts';
 import { LORDS } from '../src/core/data/lords.ts';
@@ -102,8 +104,11 @@ describe('shop & economy', () => {
     expect(p.shop.heroOffers[0]).toBeNull();
     const h = p.heroes[0]!;
     expect(h.level).toBe(1);
-    expect(h.spells).toEqual([SIGNATURE_SPELLS.pudge, null]);
-    expect(h.items).toEqual([null, null, null]);
+    // a new hero comes with its real Dota kit [Q, W, E, R] + one free slot
+    expect(h.spells).toEqual([...HERO_KITS.pudge, ...Array(SPELL_SLOTS - 4).fill(null)]);
+    expect(h.spells.length).toBe(SPELL_SLOTS);
+    expect(h.spells.every((sp) => sp === null || G.isInnate(h, sp))).toBe(true);
+    expect(h.items).toEqual(Array(ITEM_SLOTS).fill(null));
     expect(h.slot).not.toBeNull();
 
     // buying sold-out slot is a no-op
@@ -258,84 +263,113 @@ describe('tavern ★ odds', () => {
 });
 
 describe('roster', () => {
+  // lina: kit = dragon_slave, light_strike_array, fiery_soul, laguna_blade; slot 4 free
   function withHero(): { s: GameState; uid: string } {
     let s = withCoins(offer(prepGame(1, 'axe_lord'), 'lina'), 30);
     s = G.buyHero(s, 0, 0);
     const c = structuredClone(s);
-    c.players[0]!.spellInventory.push('dragon_slave', 'arc_lightning', 'rot');
+    c.players[0]!.spellInventory.push('arc_lightning', 'rot', 'crystal_nova');
     return { s: c, uid: c.players[0]!.heroes[0]!.uid };
   }
+  const kit = [...HERO_KITS.lina] as SpellId[];
+  const heroOf = (s: GameState) => s.players[0]!.heroes[0]!;
 
-  test('assign / swap / unassign keep slot 0', () => {
+  test('every slot can be reordered', () => {
     let { s, uid } = withHero();
-    const sig = SIGNATURE_SPELLS.lina;
-    // slot 0 forbidden
-    let t = G.assignSpell(s, 0, uid, 0, 0);
-    expect(t.players[0]!.heroes[0]!.spells[0]).toBe(sig);
-    s = G.assignSpell(s, 0, uid, 1, 0);
-    let h = s.players[0]!.heroes[0]!;
-    expect(h.spells).toEqual([sig, 'dragon_slave']);
-    expect(s.players[0]!.spellInventory).toEqual(['arc_lightning', 'rot']);
-    // displacing returns old spell to inventory
-    s = G.assignSpell(s, 0, uid, 1, 0);
-    expect(s.players[0]!.heroes[0]!.spells[1]).toBe('arc_lightning');
-    expect(s.players[0]!.spellInventory).toContain('dragon_slave' as SpellId);
-    // grow to 3 slots and swap
-    const c = structuredClone(s);
-    c.players[0]!.heroes[0]!.level = 10;
-    c.players[0]!.heroes[0]!.spells.push(null);
-    s = G.assignSpell(c, 0, uid, 2, c.players[0]!.spellInventory.indexOf('rot'));
-    s = G.swapSpellSlots(s, 0, uid, 1, 2);
-    h = s.players[0]!.heroes[0]!;
-    expect(h.spells).toEqual([sig, 'rot', 'arc_lightning']);
-    t = G.swapSpellSlots(s, 0, uid, 0, 1);
-    expect(t.players[0]!.heroes[0]!.spells[0]).toBe(sig);
-    s = G.unassignSpell(s, 0, uid, 1);
-    expect(s.players[0]!.heroes[0]!.spells).toEqual([sig, null, 'arc_lightning']);
-    t = G.unassignSpell(s, 0, uid, 0);
-    expect(t.players[0]!.heroes[0]!.spells[0]).toBe(sig);
+    s = G.swapSpellSlots(s, 0, uid, 0, 3);
+    expect(heroOf(s).spells).toEqual([kit[3]!, kit[1]!, kit[2]!, kit[0]!, null]);
+    s = G.swapSpellSlots(s, 0, uid, 1, 4);
+    expect(heroOf(s).spells).toEqual([kit[3]!, null, kit[2]!, kit[0]!, kit[1]!]);
+    // out of range is a no-op
+    const t = G.swapSpellSlots(s, 0, uid, 0, 9);
+    expect(heroOf(t).spells).toEqual(heroOf(s).spells);
   });
 
-  test('equip / unequip, sell hero returns spells & items', () => {
+  test('free slot: bought spells return to inventory when replaced or removed', () => {
+    let { s, uid } = withHero();
+    s = G.assignSpell(s, 0, uid, 4, 0);
+    expect(heroOf(s).spells[4]).toBe('arc_lightning');
+    expect(s.players[0]!.spellInventory).toEqual(['rot', 'crystal_nova']);
+    expect(G.isInnate(heroOf(s), 'arc_lightning')).toBe(false);
+    s = G.assignSpell(s, 0, uid, 4, 0);
+    expect(heroOf(s).spells[4]).toBe('rot');
+    expect(s.players[0]!.spellInventory).toEqual(['crystal_nova', 'arc_lightning']);
+    s = G.unassignSpell(s, 0, uid, 4);
+    expect(heroOf(s).spells[4]).toBeNull();
+    expect(s.players[0]!.spellInventory).toContain('rot' as SpellId);
+    // a hero can't know the same spell twice
+    const c = structuredClone(s);
+    c.players[0]!.spellInventory.push(kit[0]!);
+    const dup = G.assignSpell(c, 0, uid, 4, c.players[0]!.spellInventory.length - 1);
+    expect(heroOf(dup).spells[4]).toBeNull();
+  });
+
+  test('replacing or removing an innate spell destroys it', () => {
+    let { s, uid } = withHero();
+    expect(G.isInnate(heroOf(s), kit[0]!)).toBe(true);
+    s = G.assignSpell(s, 0, uid, 0, 0); // arc_lightning over dragon_slave
+    expect(heroOf(s).spells[0]).toBe('arc_lightning');
+    expect(s.players[0]!.spellInventory).toEqual(['rot', 'crystal_nova']);
+    expect(s.log.at(-1)).toContain('innate');
+    s = G.unassignSpell(s, 0, uid, 1); // light strike array removed -> lost
+    expect(heroOf(s).spells[1]).toBeNull();
+    expect(s.players[0]!.spellInventory).toEqual(['rot', 'crystal_nova']);
+    // and the freed slot takes any spell
+    s = G.assignSpell(s, 0, uid, 1, 0);
+    expect(heroOf(s).spells[1]).toBe('rot');
+  });
+
+  test('equip / unequip, sell hero returns only bought spells & items', () => {
     let { s, uid } = withHero();
     const c = structuredClone(s);
     c.players[0]!.itemInventory.push('broadsword');
     s = G.equipItem(c, 0, uid, 0, 0);
-    expect(s.players[0]!.heroes[0]!.items[0]).toBe('broadsword');
-    s = G.assignSpell(s, 0, uid, 1, 0);
+    expect(heroOf(s).items[0]).toBe('broadsword');
+    s = G.unequipItem(s, 0, uid, 0);
+    expect(s.players[0]!.itemInventory).toEqual(['broadsword']);
+    s = G.equipItem(s, 0, uid, 5, 0);
+    s = G.assignSpell(s, 0, uid, 4, 0); // arc_lightning (bought)
     s = G.sellHero(s, 0, uid);
     const p = s.players[0]!;
     expect(p.itemInventory).toContain('broadsword');
-    expect(p.spellInventory).toContain('dragon_slave' as SpellId);
-    expect(p.spellInventory).not.toContain(SIGNATURE_SPELLS.lina as SpellId);
+    expect(p.spellInventory.sort()).toEqual(['arc_lightning', 'crystal_nova', 'rot']);
+    for (const k of kit) expect(p.spellInventory).not.toContain(k);
   });
 
-  test('board cap', () => {
+  test('level-ups keep exactly SPELL_SLOTS slots', () => {
+    let s = withCoins(offer(offer(prepGame(1, 'axe_lord'), 'axe', 0), 'axe', 1), 10);
+    s = G.buyHero(s, 0, 0);
+    s = G.buyHero(s, 0, 1);
+    s = G.upgradeHero(s, 0, heroOf(s).uid);
+    expect(heroOf(s).level).toBe(5);
+    expect(heroOf(s).spells).toEqual([...HERO_KITS.axe, null]);
+  });
+
+  test('max 5 heroes, all in the arena (no bench)', () => {
     let s = withCoins(prepGame(1, 'axe_lord'), 100);
     const ids: HeroId[] = ['axe', 'lina', 'zeus', 'sniper', 'pudge', 'slark', 'ursa'];
     for (const id of ids) s = G.buyHero(offer(s, id), 0, 0);
     const p = s.players[0]!;
+    expect(BENCH_SIZE).toBe(0);
+    expect(p.heroes.length).toBe(boardCap(1));
     expect(G.boardCount(p)).toBe(boardCap(1));
-    expect(p.heroes.length).toBe(boardCap(1) + BENCH_SIZE);
-    // full bench: next new hero no-op
+    expect(p.heroes.every((h) => h.slot !== null)).toBe(true);
+    // a 6th distinct hero is a no-op (sell one first) ...
     const t = G.buyHero(offer(s, 'tinker'), 0, 0);
-    expect(t.players[0]!.heroes.length).toBe(p.heroes.length);
-    // bench hero can't go onto a free board slot when at cap
-    const benchHero = p.heroes.find((h) => h.slot === null)!;
-    const free = [0, 1, 2, 3].flatMap((col) => [0, 1, 2].map((row) => ({ col, row }))).find((sl) =>
-      !p.heroes.some((h) => h.slot?.col === sl.col && h.slot.row === sl.row),
+    expect(t.players[0]!.heroes.length).toBe(boardCap(1));
+    // ... but buying a duplicate still works (it becomes an upgrade)
+    const d = G.buyHero(offer(s, 'axe'), 0, 0);
+    expect(d.players[0]!.heroes.find((h) => h.heroId === 'axe')!.pendingUpgrades).toBe(1);
+    // there is no bench to move a hero to
+    const hero = p.heroes[0]!;
+    const u = G.placeHero(s, 0, hero.uid, null);
+    expect(u.players[0]!.heroes.find((h) => h.uid === hero.uid)!.slot).toEqual(hero.slot);
+    // heroes can still move to a free formation tile
+    const free = [0, 1, 2].flatMap((col) => [0, 1, 2, 3].map((row) => ({ col, row }))).find(
+      (sl) => !p.heroes.some((h) => h.slot?.col === sl.col && h.slot.row === sl.row),
     )!;
-    const u = G.placeHero(s, 0, benchHero.uid, free);
-    expect(G.boardCount(u.players[0]!)).toBe(boardCap(1));
-    // but can swap with a board hero
-    const boardHero = p.heroes.find((h) => h.slot !== null)!;
-    const v = G.placeHero(s, 0, benchHero.uid, boardHero.slot);
-    const vp = v.players[0]!;
-    expect(vp.heroes.find((h) => h.uid === benchHero.uid)!.slot).toEqual(boardHero.slot);
-    expect(vp.heroes.find((h) => h.uid === boardHero.uid)!.slot).toBeNull();
-    // board hero can move to a free slot
-    const w = G.placeHero(s, 0, boardHero.uid, free);
-    expect(w.players[0]!.heroes.find((h) => h.uid === boardHero.uid)!.slot).toEqual(free);
+    const w = G.placeHero(s, 0, hero.uid, free);
+    expect(w.players[0]!.heroes.find((h) => h.uid === hero.uid)!.slot).toEqual(free);
   });
 });
 
@@ -368,7 +402,7 @@ describe('lords', () => {
     const uid = s.players[0]!.heroes[0]!.uid;
     s = G.useLordAbility(s, 0, uid);
     expect(s.players[0]!.heroes[0]!.level).toBe(13);
-    expect(s.players[0]!.heroes[0]!.spells.length).toBe(3);
+    expect(s.players[0]!.heroes[0]!.spells.length).toBe(SPELL_SLOTS);
     s = G.useLordAbility(s, 0, uid);
     expect(s.players[0]!.heroes[0]!.level).toBe(13);
 

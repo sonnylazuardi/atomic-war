@@ -26,6 +26,8 @@ export interface SpawnCtx {
   team: (uid: string) => Team | undefined;
   nextId: () => number;
   shake: (amount: number) => void;
+  /** caster holds Aghanim's Scepter (status 'aghanim') */
+  aghs?: (uid: string) => boolean;
 }
 
 /** turn one event into zero or more effects */
@@ -51,10 +53,15 @@ export function effectsForEvent(ev: BattleEvent, ctx: SpawnCtx): Effect[] {
         color: def?.vfx.color ?? TEAM_COLORS[team],
       });
       if (def?.ultimate) ctx.shake(7);
+      const aghs = !!ctx.aghs?.(ev.src);
+      if (aghs) {
+        // upgraded cast: blue flash at the caster
+        out.push({ kind: 'burst', id: ctx.nextId(), start: t, dur: 0.55, x: ev.from.x, y: ev.from.y - 40, color: '#5fb8ff', r: 40 });
+      }
       // spell name callout
       if (def) {
         const p = ctx.pos(ev.src) ?? ev.from;
-        out.push({ kind: 'text', id: ctx.nextId(), start: t, dur: 1.1, x: Math.min(940, Math.max(60, p.x)), y: Math.max(70, p.y - 122), text: def.name, color: def.ultimate ? '#ffe28a' : '#d8e4ff', size: def.ultimate ? 15 : 12, stroke: '#000' });
+        out.push({ kind: 'text', id: ctx.nextId(), start: t, dur: 1.1, x: Math.min(760, Math.max(240, p.x)), y: Math.max(40, p.y - 122), text: aghs ? `${def.name} ✦` : def.name, color: aghs ? '#8fd3ff' : def.ultimate ? '#ffe28a' : '#d8e4ff', size: def.ultimate ? 15 : 12, stroke: '#000' });
       }
       break;
     }
@@ -154,14 +161,14 @@ export function effectsForEvent(ev: BattleEvent, ctx: SpawnCtx): Effect[] {
   return out;
 }
 
-function FloatText({ e, now }: { e: Extract<Effect, { kind: 'text' }>; now: number }) {
+function FloatText({ e, now, k: sc = 1 }: { e: Extract<Effect, { kind: 'text' }>; now: number; k?: number }) {
   const k = clamp01((now - e.start) / e.dur);
   const rise = easeOut(k) * (e.big ? 34 : 26);
   const pop = e.big ? 1 + Math.max(0, 0.6 - k * 4) : 1 + Math.max(0, 0.3 - k * 3);
   const op = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
   return (
     <text
-      transform={`translate(${e.x.toFixed(1)},${(e.y - rise).toFixed(1)}) scale(${pop.toFixed(3)})`}
+      transform={`translate(${e.x.toFixed(1)},${(e.y - rise).toFixed(1)}) scale(${(pop * sc).toFixed(3)})`}
       textAnchor="middle"
       fontSize={e.size}
       fontWeight={800}
@@ -177,12 +184,12 @@ function FloatText({ e, now }: { e: Extract<Effect, { kind: 'text' }>; now: numb
   );
 }
 
-function Pop({ e, now }: { e: Extract<Effect, { kind: 'pop' }>; now: number }) {
+function Pop({ e, now, k: sc = 1 }: { e: Extract<Effect, { kind: 'pop' }>; now: number; k?: number }) {
   const k = clamp01((now - e.start) / e.dur);
   const s = k < 0.2 ? easeOut(k / 0.2) * 1.25 : 1.25 - Math.min(0.25, (k - 0.2) * 1.2);
   const op = k < 0.75 ? 1 : 1 - (k - 0.75) / 0.25;
   return (
-    <text transform={`translate(${e.x},${e.y - k * 18}) scale(${s.toFixed(3)})`} textAnchor="middle" dominantBaseline="middle" fontSize={e.size} opacity={op}>
+    <text transform={`translate(${e.x},${e.y - k * 18}) scale(${(s * sc).toFixed(3)})`} textAnchor="middle" dominantBaseline="middle" fontSize={e.size} opacity={op}>
       {e.glyph}
     </text>
   );
@@ -234,12 +241,12 @@ export function VfxLayer({ effects, now }: { effects: Effect[]; now: number }) {
 }
 
 /** floating text + glyph pops (top layer) */
-export function TextLayer({ effects, now }: { effects: Effect[]; now: number }) {
+export function TextLayer({ effects, now, scale = 1 }: { effects: Effect[]; now: number; scale?: number }) {
   return (
     <g pointerEvents="none">
       {effects.map((e) => {
-        if (e.kind === 'text') return <FloatText key={e.id} e={e} now={now} />;
-        if (e.kind === 'pop') return <Pop key={e.id} e={e} now={now} />;
+        if (e.kind === 'text') return <FloatText key={e.id} e={e} now={now} k={scale} />;
+        if (e.kind === 'pop') return <Pop key={e.id} e={e} now={now} k={scale} />;
         return null;
       })}
     </g>

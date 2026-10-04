@@ -63,6 +63,7 @@ export function advance(pb: Playback, dtBattle: number) {
         return u ? { x: u.x, y: u.y } : undefined;
       },
       team: (uid: string) => byUid.get(uid)?.team,
+      aghs: (uid: string) => !!byUid.get(uid)?.statuses.includes('aghanim'),
       nextId: () => pb.idSeq++,
       shake: (amount: number) => {
         pb.shakeAmp = Math.max(amount, currentShake(pb));

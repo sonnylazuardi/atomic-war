@@ -8,7 +8,22 @@ import type { Attr, Effect, GameState, HeroClass, ItemId, LordId, OwnedHero, Pla
 import { lordActiveAvailable, refreshCostFor, spellCostFor, useLordAbilityM } from './lords.ts';
 import { assignSpellM, equipItemM, sellHeroM, sellItemM, sellSpellM, upgradeHeroM } from './roster.ts';
 import { buyHeroM, buyItemM, buySpellM, itemCost, refreshShopM, upgradeShopM } from './shop.ts';
-import { benchCount, firstFreeSlot, withRng, type GS } from './util.ts';
+import { benchCount, firstFreeSlot, isInnate, withRng, type GS } from './util.ts';
+
+const spellStars = (id: SpellId) => SPELLS[id]?.stars ?? 1;
+/** a bought spell must beat an innate one by this many stars before a bot destroys the innate */
+const REPLACE_GAP = 2;
+
+/** The weakest non-ultimate innate spell on a hero (replacement candidate). */
+function weakestInnate(h: OwnedHero): { slot: number; stars: number } | null {
+  let best: { slot: number; stars: number } | null = null;
+  h.spells.forEach((sp, i) => {
+    if (!sp || !isInnate(h, sp) || SPELLS[sp]?.ultimate) return;
+    const st = spellStars(sp);
+    if (!best || st < best.stars) best = { slot: i, stars: st };
+  });
+  return best;
+}
 
 export function botPickLord(s: GameState): LordId {
   return withRng(s, (rng) => rng.pick(LORD_IDS));
@@ -103,9 +118,14 @@ function assignSpells(s: GS, p: PlayerState) {
     let best: { h: OwnedHero; slot: number; score: number } | null = null;
     for (const h of team) {
       if (h.spells.includes(sp)) continue;
-      const slot = h.spells.indexOf(null, 1);
-      if (slot < 1) continue;
-      const score = spellScore(clsOf(h), sp) + h.level / 30;
+      let slot = h.spells.indexOf(null);
+      let score = spellScore(clsOf(h), sp) + h.level / 30;
+      if (slot < 0) {
+        const weak = weakestInnate(h);
+        if (!weak || spellStars(sp) < weak.stars + REPLACE_GAP) continue;
+        slot = weak.slot;
+        score -= 1; // prefer filling a free slot over destroying an innate spell
+      }
       if (!best || score > best.score) best = { h, slot, score };
     }
     if (best) assignSpellM(s, p.id, best.h.uid, best.slot, inv);
@@ -194,15 +214,24 @@ function tryBuySpell(s: GS, p: PlayerState): boolean {
   const cost = spellCostFor(p);
   if (p.coins < cost) return false;
   const team = bestHeroes(p, s.round);
-  const freeSlots = team.reduce((n, h) => n + h.spells.filter((x, i) => i > 0 && x === null).length, 0);
-  if (freeSlots <= p.spellInventory.length) return false;
+  const freeSlots = team.reduce((n, h) => n + h.spells.filter((x) => x === null).length, 0);
+  const fill = freeSlots > p.spellInventory.length;
+  // no free slot: occasionally upgrade a weak innate with a much rarer spell (keep a little reserve)
+  const upgrade = !fill && p.spellInventory.length === 0 && s.round >= 4 && p.coins >= cost + 3;
+  if (!fill && !upgrade) return false;
   let bestIdx = -1;
   let bestScore = 2;
   p.shop.spellOffers.forEach((id, i) => {
     if (!id) return;
     for (const h of team) {
-      if (h.spells.includes(id) || h.spells.indexOf(null, 1) < 1) continue;
-      const sc = spellScore(clsOf(h), id);
+      if (h.spells.includes(id)) continue;
+      if (fill) {
+        if (h.spells.indexOf(null) < 0) continue;
+      } else {
+        const weak = weakestInnate(h);
+        if (!weak || spellStars(id) < weak.stars + REPLACE_GAP) continue;
+      }
+      const sc = spellScore(clsOf(h), id) + (fill ? 0 : spellStars(id) / 5);
       if (sc >= bestScore) {
         bestScore = sc;
         bestIdx = i;

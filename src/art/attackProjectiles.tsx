@@ -137,6 +137,62 @@ const EnigmaOrb: ProjectileArt = ({ t }) => (
   </g>
 );
 
+const WindrangerArrow: ProjectileArt = ({ t }) => {
+  const w = (x: number, k: number) => Math.sin(x * 0.3 + t * 28 + k) * (2 + (-x - 8) * 0.06);
+  const trail = (k: number) =>
+    Array.from({ length: 9 }, (_, i) => -8 - i * 4)
+      .map((x, i) => `${i === 0 ? 'M' : 'L'}${x},${(w(x, k) + k * 1.2).toFixed(2)}`)
+      .join(' ');
+  return (
+    <g>
+      <path d={trail(0)} stroke="#7dffa8" strokeWidth={2} fill="none" opacity={0.55} strokeLinecap="round" />
+      <path d={trail(2.4)} stroke="#d8ffe6" strokeWidth={1.1} fill="none" opacity={0.45} strokeLinecap="round" />
+      <line x1={-16} y1={0} x2={6} y2={0} stroke="#f4efe0" strokeWidth={1.4} />
+      <path d="M-16,0 l-5,-3.2 l3,3.2 l-3,3.2 Z M-12,0 l-4,-3 M-12,0 l-4,3" fill="#4ae07a" stroke="#2fb85a" strokeWidth={1.1} />
+      <path d="M10,0 L4,-2.8 L5,0 L4,2.8 Z" fill="#e8fff0" stroke="#3ad06a" strokeWidth={0.7} />
+      <circle cx={7} r={4.5} fill="#6bff9a" opacity={0.22} />
+    </g>
+  );
+};
+
+/** Jakiro: twin-headed dragon alternates ice and fire orbs (decided per ~0.5s window of battle time). */
+const JakiroOrb: ProjectileArt = ({ t }) => {
+  const ice = Math.floor(t * 2) % 2 === 0;
+  const core = ice ? '#e6f8ff' : '#fff1c2';
+  const mid = ice ? '#7ad0ff' : '#ff9a2e';
+  const outer = ice ? '#3a9cff' : '#ff4a12';
+  const fl = 1 + Math.sin(t * 36) * 0.1;
+  return (
+    <g>
+      <ellipse cx={-13} rx={15 * fl} ry={5} fill={outer} opacity={0.35} />
+      {[0, 1, 2].map((i) => (
+        <circle key={i} cx={-9 - i * 6} cy={Math.sin(t * 22 + i * 2) * 3} r={2.4 - i * 0.5} fill={mid} opacity={0.75 - i * 0.2} />
+      ))}
+      <circle r={9 * fl} fill={outer} opacity={0.3} />
+      <circle r={6} fill={mid} />
+      <circle cx={1.5} r={3} fill={core} />
+      {ice ? <path d="M0,-8 L0,8 M-7,-4 L7,4 M-7,4 L7,-4" stroke="#ffffff" strokeWidth={0.8} opacity={0.6} /> : null}
+    </g>
+  );
+};
+
+/** Dragon Knight is melee, so this only appears when Elder Dragon Form gives him range: a green dragon fireball. */
+const DragonFireball: ProjectileArt = ({ t }) => {
+  const fl = 1 + Math.sin(t * 38) * 0.12;
+  return (
+    <g>
+      <ellipse cx={-16} rx={20 * fl} ry={6} fill="#3ad04a" opacity={0.35} />
+      <ellipse cx={-8} rx={12} ry={7 * fl} fill="#8aff5a" opacity={0.55} />
+      {[0, 1, 2].map((i) => (
+        <circle key={i} cx={-14 - i * 7} cy={Math.sin(t * 24 + i * 2) * 4} r={2.6 - i * 0.6} fill="#e8ff8a" opacity={0.8 - i * 0.2} />
+      ))}
+      <circle r={11 * fl} fill="#2ac03a" opacity={0.35} />
+      <circle r={7} fill="#7dff4a" />
+      <circle cx={1.5} r={3.8} fill="#f6ffd0" />
+    </g>
+  );
+};
+
 const ATTACK_PROJECTILES: Record<HeroId, ProjectileArt> = {
   pudge: None,
   axe: None,
@@ -154,6 +210,9 @@ const ATTACK_PROJECTILES: Record<HeroId, ProjectileArt> = {
   sniper: SniperBullet,
   crystal_maiden: CrystalShard,
   dazzle: DazzleOrb,
+  dragon_knight: DragonFireball,
+  windranger: WindrangerArrow,
+  jakiro: JakiroOrb,
 };
 
 /** true when the hero has a visible basic-attack projectile (ranged) */

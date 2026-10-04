@@ -1,64 +1,76 @@
-// Right edge: one row per owned hero (board first, then bench) with spell + item slots.
-import { BENCH_SIZE, LEVELS_PER_UPGRADE, boardCap } from '../../../core/constants.ts';
+// Right edge: hero roster like the real game — Items / Skills tabs, one row per hero with its slots.
+import { LEVELS_PER_UPGRADE, MAX_HEROES } from '../../../core/constants.ts';
 import { boardOrder } from '../../../core/game/index.ts';
 import { teamModsFor } from '../../../core/game/lords.ts';
 import type { ItemId, OwnedHero, SpellId, TeamMods } from '../../../core/types.ts';
 import { useGame } from '../../store.ts';
-import { fmt, heroDef, itemDef, safeStats, spellDef, starColor } from '../defs.ts';
+import { CLASS_INFO, fmt, heroDef, itemDef, safeStats, spellDef, starColor } from '../defs.ts';
 import { dragProps, useDrop } from '../dnd.ts';
 import { HeroPortrait, phaseOf } from '../HeroPortrait.tsx';
-import { ItemTip, SpellTip, tip } from '../Tooltip.tsx';
-import { useUi } from '../uiState.ts';
-import { clickHero, dropOnHero, safe } from './actions.ts';
+import { AghGlyph, HeroTip, ItemTip, SpellTip, tip } from '../Tooltip.tsx';
+import { useUi, type RosterTab } from '../uiState.ts';
+import { assignSpellSafe, clickHero, confirmInnateLoss, dropOnHero, innate, safe } from './actions.ts';
 
-function SpellSlot({ hero, idx, id, prep }: { hero: OwnedHero; idx: number; id: SpellId | null; prep: boolean }) {
+export function SpellSlot({ hero, idx, id, prep }: { hero: OwnedHero; idx: number; id: SpellId | null; prep: boolean }) {
   const g = useGame();
   const ui = useUi();
-  const locked = idx === 0;
+  const isInnate = innate(hero, id);
   const drop = useDrop(
-    (p) => prep && !locked && (p.kind === 'spellInv' || (p.kind === 'spellSlot' && p.uid === hero.uid && p.slot !== idx)),
+    (p) => prep && (p.kind === 'spellInv' || (p.kind === 'spellSlot' && p.uid === hero.uid && p.slot !== idx)),
     (p) => {
-      if (p.kind === 'spellInv') g.assignSpell(hero.uid, idx, p.idx);
+      if (p.kind === 'spellInv') assignSpellSafe(hero, idx, p.idx);
       else if (p.kind === 'spellSlot') g.swapSpellSlots(hero.uid, p.slot, idx);
       ui.setPending(null);
     },
   );
   const s = id ? spellDef(id) : null;
-  const pendingHere = prep && ui.pending?.kind === 'spell' && !locked;
+  const agh = !!s?.aghanim && hero.items.includes('aghanims_scepter');
+  const pendingHere = prep && ui.pending?.kind === 'spell';
+  // warn while an inventory spell hovers an innate slot: dropping destroys the kit spell
+  const warn = s && isInnate && (drop.over || pendingHere) ? `replaces ${s.name} (innate, lost)` : null;
   return (
     <div
-      className={`rs spell ${locked ? 'sig' : ''} ${s ? 'filled' : 'empty'} ${drop.over ? 'drop-over' : ''} ${pendingHere ? 'targetable' : ''}`}
-      style={s ? { ['--star' as string]: starColor(s.stars ?? 1) } : undefined}
+      className={`rs spell ${agh ? 'agh' : ''} ${isInnate ? 'innate' : ''} ${s?.ultimate ? 'ult' : ''} ${s ? 'filled' : 'empty'} ${drop.over ? 'drop-over' : ''} ${pendingHere ? 'targetable' : ''} ${warn && drop.over ? 'warn' : ''}`}
+      style={{ ...(s ? { ['--star' as string]: starColor(s.stars ?? 1) } : {}), ['--kit-c' as string]: heroDef(hero.heroId).palette.primary }}
       onClick={(e) => {
         e.stopPropagation();
         if (pendingHere && ui.pending) {
-          g.assignSpell(hero.uid, idx, ui.pending.idx);
-          ui.setPending(null);
+          if (assignSpellSafe(hero, idx, ui.pending.idx)) ui.setPending(null);
         } else clickHero(hero.uid);
       }}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (prep && !locked && id) g.unassignSpell(hero.uid, idx);
+        if (prep && id && confirmInnateLoss(hero, idx, 'remove')) g.unassignSpell(hero.uid, idx);
       }}
       {...(id
         ? tip(() => (
             <>
-              <SpellTip id={id} />
-              <div className="tip-foot">{locked ? 'Signature · always cast first' : `Cast priority ${idx + 1} · drag to reorder · right-click removes`}</div>
+              <SpellTip id={id} upgraded={agh} />
+              <div className="tip-foot">
+                {isInnate ? 'Innate (hero kit) · replacing or removing destroys it · ' : ''}
+                Cast priority {idx + 1} · drag to reorder · right-click removes
+              </div>
             </>
           ))
         : {})}
-      {...dragProps(prep && !locked && id ? { kind: 'spellSlot', uid: hero.uid, slot: idx } : null)}
+      {...dragProps(prep && id ? { kind: 'spellSlot', uid: hero.uid, slot: idx } : null)}
       {...drop.props}
     >
       {s ? s.glyph : ''}
-      {locked && <i className="rs-lock">🔒</i>}
+      {isInnate && <i className="rs-innate" aria-label="innate" />}
+      {s?.ultimate && <i className="rs-ult">R</i>}
+      {agh && (
+        <i className="rs-agh" aria-label="Aghanim's upgrade active">
+          <AghGlyph />
+        </i>
+      )}
+      {warn && drop.over && <span className="rs-warn">{warn}</span>}
     </div>
   );
 }
 
-function ItemSlot({ hero, idx, id, prep }: { hero: OwnedHero; idx: number; id: ItemId | null; prep: boolean }) {
+export function ItemSlot({ hero, idx, id, prep }: { hero: OwnedHero; idx: number; id: ItemId | null; prep: boolean }) {
   const g = useGame();
   const ui = useUi();
   const drop = useDrop(
@@ -102,54 +114,47 @@ function ItemSlot({ hero, idx, id, prep }: { hero: OwnedHero; idx: number; id: I
   );
 }
 
-function RosterRow({ hero, mods, prep, bench }: { hero: OwnedHero; mods?: TeamMods; prep: boolean; bench: boolean }) {
+function RosterRow({ hero, mods, prep, tab }: { hero: OwnedHero; mods?: TeamMods; prep: boolean; tab: RosterTab }) {
   const g = useGame();
   const selected = useUi((s) => s.selectedUid === hero.uid);
   const ui = useUi();
   const d = heroDef(hero.heroId);
+  const c = CLASS_INFO[d.cls];
   const st = safeStats(hero, mods);
   const drop = useDrop(
     (p) => prep && (p.kind === 'spellInv' || p.kind === 'itemInv' || (p.kind === 'hero' && p.uid !== hero.uid && !!hero.slot)),
     (p) => dropOnHero(p, hero.uid),
   );
-  const sealed = [10, 20].filter((lv) => hero.level < lv && hero.spells.length < 4).slice(0, 4 - hero.spells.length);
   const targetable = prep && (ui.lordTargeting || !!ui.pending);
   return (
     <div
       data-testid="hero-card"
-      className={`rrow ${selected ? 'selected' : ''} ${bench ? 'bench' : ''} ${drop.over ? 'drop-over' : ''} ${targetable ? 'targetable' : ''}`}
-      style={{ ['--hero-c' as string]: d.palette.primary }}
+      className={`rrow ${selected ? 'selected' : ''} ${drop.over ? 'drop-over' : ''} ${targetable ? 'targetable' : ''}`}
+      style={{ ['--hero-c' as string]: d.palette.primary, ['--cls-c' as string]: c.color }}
       onClick={() => clickHero(hero.uid)}
       {...dragProps(prep ? { kind: 'hero', uid: hero.uid } : null)}
       {...drop.props}
     >
-      <div className="rr-left">
-        <div className="rr-port">
+      <div className="rr-main">
+        <span className="rr-cls" {...tip(() => <div className="tip-body">{c.label}</div>)}>
+          <i>{c.icon}</i>
+        </span>
+        <div className="rr-port" {...tip(() => <HeroTip id={hero.heroId} />)}>
           <HeroPortrait heroId={hero.heroId} phase={phaseOf(hero.uid)} />
           <span className="rr-lvl">{hero.level}</span>
         </div>
-        <div className="rr-hp">{st ? fmt(st.maxHp) : '—'}</div>
-      </div>
-      <div className="rr-body">
-        <div className="rr-name">
-          <span>{d.name}</span>
-          {bench && <em className="rr-tag">bench</em>}
-          {hero.kills > 0 && <span className="rr-kills">☠{hero.kills}</span>}
-        </div>
         <div className="rr-slots">
-          {hero.spells.map((s, i) => (
-            <SpellSlot key={i} hero={hero} idx={i} id={s} prep={prep} />
-          ))}
-          {sealed.map((lv) => (
-            <div key={lv} className="rs sealed" {...tip(() => <div className="tip-body">Unlocks at level {lv}</div>)}>
-              {lv}
-            </div>
-          ))}
-          <span className="rs-gap" />
-          {hero.items.map((it, i) => (
-            <ItemSlot key={i} hero={hero} idx={i} id={it} prep={prep} />
-          ))}
+          {tab === 'skills'
+            ? hero.spells.map((s, i) => <SpellSlot key={i} hero={hero} idx={i} id={s} prep={prep} />)
+            : hero.items.map((it, i) => <ItemSlot key={i} hero={hero} idx={i} id={it} prep={prep} />)}
         </div>
+      </div>
+      <div className="rr-hpline">
+        <span className="rr-hp">{st ? fmt(st.maxHp) : '—'}</span>
+        <div className="rr-hpbar">
+          <div />
+        </div>
+        {hero.kills > 0 && <span className="rr-kills">☠{hero.kills}</span>}
       </div>
       {hero.pendingUpgrades > 0 && (
         <button
@@ -168,38 +173,56 @@ function RosterRow({ hero, mods, prep, bench }: { hero: OwnedHero; mods?: TeamMo
   );
 }
 
+function TabIcon({ kind }: { kind: RosterTab }) {
+  return kind === 'items' ? (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M4 13c0-5 3.6-9 8-9s8 4 8 9v3h-3v-3a5 5 0 0 0-10 0v3H4z" fill="currentColor" />
+      <path d="M11 4h2v7h-2z" fill="currentColor" opacity=".6" />
+      <path d="M4 17h5v3H4zM15 17h5v3h-5z" fill="currentColor" opacity=".8" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M5 3h11a3 3 0 0 1 3 3v15H8a3 3 0 0 1-3-3z" fill="currentColor" />
+      <path d="M8 18h11v3H8a1.5 1.5 0 0 1 0-3z" fill="currentColor" opacity=".55" />
+      <path d="M12 6l1.2 2.6L16 9l-2 2 .5 2.8L12 12.5 9.5 13.8 10 11 8 9l2.8-.4z" fill="#0d1018" />
+    </svg>
+  );
+}
+
 export function Roster() {
   const me = useGame((s) => s.players[0]!);
-  const round = useGame((s) => s.round);
   const phase = useGame((s) => s.phase);
-  const placeHero = useGame((s) => s.placeHero);
+  const tab = useUi((s) => s.rosterTab);
+  const setTab = useUi((s) => s.setRosterTab);
   const prep = phase === 'prep';
   const mods = safe(() => teamModsFor(me), undefined);
   const board = safe(() => boardOrder(me), me.heroes.filter((h) => h.slot));
-  const bench = me.heroes.filter((h) => !h.slot);
-  const benchDrop = useDrop(
-    (p) => prep && p.kind === 'hero' && !!me.heroes.find((h) => h.uid === p.uid)?.slot,
-    (p) => p.kind === 'hero' && placeHero(p.uid, null),
-  );
+  const rest = me.heroes.filter((h) => !board.includes(h));
   return (
     <aside className="hud-roster">
-      <div className="roster-head">
-        Heroes <span>{board.length}/{boardCap(round)}</span>
+      <div className="roster-tabs" role="tablist">
+        {(['items', 'skills'] as const).map((t) => (
+          <button
+            key={t}
+            role="tab"
+            aria-selected={tab === t}
+            className={`roster-tab ${tab === t ? 'on' : ''}`}
+            data-testid={`roster-tab-${t}`}
+            onClick={() => setTab(t)}
+          >
+            <TabIcon kind={t} />
+            {t === 'items' ? 'Items' : 'Skills'}
+          </button>
+        ))}
+        <span className="roster-count">
+          {me.heroes.length}/{MAX_HEROES}
+        </span>
       </div>
       <div className="roster-list">
-        {board.map((h) => (
-          <RosterRow key={h.uid} hero={h} mods={mods} prep={prep} bench={false} />
+        {[...board, ...rest].map((h) => (
+          <RosterRow key={h.uid} hero={h} mods={mods} prep={prep} tab={tab} />
         ))}
-        {board.length === 0 && <div className="roster-empty">Press Space to recruit heroes</div>}
-        <div className={`bench-zone ${benchDrop.over ? 'drop-over' : ''}`} {...benchDrop.props}>
-          <div className="roster-sub">
-            Bench <span>{bench.length}/{BENCH_SIZE}</span>
-          </div>
-          {bench.map((h) => (
-            <RosterRow key={h.uid} hero={h} mods={mods} prep={prep} bench />
-          ))}
-          {bench.length === 0 && <div className="bench-empty">drag a hero here to bench it</div>}
-        </div>
+        {me.heroes.length === 0 && <div className="roster-empty">Open the Mystery shop to recruit heroes</div>}
       </div>
     </aside>
   );

@@ -1,7 +1,8 @@
-// Signature VFX for the 16 hero signature spells (casts + passive procs share the vfx map).
+// Signature VFX for the hero signature spells (casts + passive procs share the vfx map).
 import type { VfxBundle } from '../types.ts';
 import { GlaivesOfWisdom, LagunaBlade, Laser, ThundergodsWrath, BlackHoleCast, BlackHoleZone } from './sig/magic.tsx';
 import { CounterHelix, CoupDeGrace, Enrage, EssenceShift, FleshHeap, Omnislash } from './sig/melee.tsx';
+import { ElderDragonForm, FocusFire, MacropyreCast, MacropyreZone } from './sig/dragons.tsx';
 import { AssassinateBullet, AssassinateReticle, FreezingFieldCast, FreezingFieldZone, Marksmanship, ShallowGrave, SplitShot } from './sig/ranged.tsx';
 
 export const signatureVfx: VfxBundle = {
@@ -22,7 +23,10 @@ export const signatureVfx: VfxBundle = {
     assassinate: AssassinateReticle,
     freezing_field: FreezingFieldCast,
     shallow_grave: ShallowGrave,
+    elder_dragon_form: ElderDragonForm,
+    focus_fire: FocusFire,
+    macropyre: MacropyreCast,
   },
-  zones: { black_hole: BlackHoleZone, freezing_field: FreezingFieldZone },
+  zones: { black_hole: BlackHoleZone, freezing_field: FreezingFieldZone, macropyre: MacropyreZone },
   projectiles: { assassinate: AssassinateBullet },
 };

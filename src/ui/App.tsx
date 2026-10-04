@@ -1,28 +1,31 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { hideTip, TooltipLayer } from './components/Tooltip.tsx';
 import { LogToasts } from './components/LogToasts.tsx';
+import { useLayoutMode } from './components/hud/layout.ts';
 import { Gallery } from './screens/Gallery.tsx';
 import { LordSelect } from './screens/LordSelect.tsx';
 import { Play } from './screens/Play.tsx';
 import { useGame } from './store.ts';
 
-const BASE_W = 1366;
-const BASE_H = 768;
+/** Logical stage sizes: desktop 1366x768; landscape phones get a smaller stage so the HUD is less tiny. */
+const STAGES = { desktop: [1366, 768], compact: [1100, 620] } as const;
 
-/** Scale a >= 1366x768 logical stage to fill the window (no page scroll at any size). */
-function useStage() {
+/** Scale a logical stage to fill the window (no page scroll at any size). */
+function useStage(kind: keyof typeof STAGES) {
+  const [bw, bh] = STAGES[kind];
   const calc = () => {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const scale = Math.min(vw / BASE_W, vh / BASE_H);
+    const scale = Math.min(vw / bw, vh / bh);
     return { scale, w: vw / scale, h: vh / scale };
   };
   const [s, setS] = useState(calc);
   useLayoutEffect(() => {
     const on = () => setS(calc());
+    on();
     window.addEventListener('resize', on);
     return () => window.removeEventListener('resize', on);
-  }, []);
+  }, [bw, bh]);
   return s;
 }
 
@@ -30,7 +33,8 @@ let started = false;
 
 function Game() {
   const phase = useGame((s) => s.phase);
-  const stage = useStage();
+  const mode = useLayoutMode();
+  const stage = useStage(mode === 'compact' ? 'compact' : 'desktop');
 
   useEffect(() => {
     if (started) return;
@@ -56,11 +60,24 @@ function Game() {
       screen = <div className="screen loading">Summoning atoms…</div>;
   }
 
+  if (mode === 'mobile') {
+    // phones in portrait: real CSS px, column layout, no stage scaling
+    return (
+      <div className="viewport mobile" onMouseDown={hideTip} onTouchStartCapture={hideTip}>
+        <div id="stage" className="stage mstage">
+          {screen}
+          <LogToasts />
+          <TooltipLayer />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="viewport" onMouseDown={hideTip}>
+    <div className="viewport" onMouseDown={hideTip} onTouchStartCapture={hideTip}>
       <div
         id="stage"
-        className="stage"
+        className={`stage ${mode === 'compact' ? 'compact' : ''}`}
         style={{ width: stage.w, height: stage.h, transform: `scale(${stage.scale})` }}
       >
         {screen}

@@ -5,16 +5,16 @@ import {
   HERO_OFFERS,
   ITEM_SLOTS,
   MAX_SHOP_LEVEL,
+  SPELL_SLOTS,
   TAVERN_ODDS,
   boardCap,
   offersForShopLevel,
   shopUpgradeCost,
-  spellSlotsForLevel,
 } from '../constants.ts';
 import { HEROES } from '../data/heroes.ts';
 import { ITEMS } from '../data/items.ts';
 import { SPELLS } from '../data/spells.ts';
-import { HERO_IDS, ITEM_IDS, SIGNATURE_SPELLS, SPELL_IDS } from '../ids.ts';
+import { HERO_IDS, HERO_KITS, ITEM_IDS, SPELL_IDS } from '../ids.ts';
 import type { Rng } from '../rng.ts';
 import type { GameState, HeroId, ItemId, OwnedHero, PlayerState, SpellId, Stars } from '../types.ts';
 import { refreshCostFor, spellCostFor } from './lords.ts';
@@ -131,8 +131,9 @@ export function emptyShop() {
 /** Create a fresh level-1 hero (not placed). */
 export function makeHero(s: GameState, pid: number, heroId: HeroId): OwnedHero {
   const uid = withRng(s, (rng) => `p${pid}-${heroId}-${rng.int(0, 0x7fffffff).toString(36)}`);
-  const spells: (SpellId | null)[] = [SIGNATURE_SPELLS[heroId]];
-  while (spells.length < spellSlotsForLevel(1)) spells.push(null);
+  // the hero's real Dota kit [Q, W, E, R] (innate) + free slot(s)
+  const spells: (SpellId | null)[] = [...HERO_KITS[heroId]].slice(0, SPELL_SLOTS);
+  while (spells.length < SPELL_SLOTS) spells.push(null);
   return {
     uid,
     heroId,
@@ -166,7 +167,7 @@ export function buyHeroM(s: GS, pid: number, offerIdx: number) {
   } else {
     let slot = null;
     if (boardCount(p) < boardCap(s.round)) slot = firstFreeSlot(p, heroId);
-    if (!slot && benchCount(p) >= BENCH_SIZE) return fail(s, p, 'Bench is full.');
+    if (!slot && benchCount(p) >= BENCH_SIZE) return fail(s, p, `You can field at most ${boardCap(s.round)} heroes — sell one first.`);
     const h = makeHero(s, pid, heroId);
     h.slot = slot;
     p.heroes.push(h);

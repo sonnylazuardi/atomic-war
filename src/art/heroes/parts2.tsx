@@ -415,3 +415,23 @@ export function RuneRing({ x, y, r, rot, c, o = 1, ry = 1, ticks = 8 }: { x: num
     </g>
   );
 }
+
+/**
+ * Aghanim's upgrade glyph: a small blue crown with a scepter gem, centered at the origin, ~14 units wide.
+ * Pure SVG; `size` scales it (14 = default width), `glow` 0..1 adds a soft halo.
+ */
+export function AghanimCrown({ size = 14, glow = 0 }: { size?: number; glow?: number }) {
+  const s = size / 14;
+  return (
+    <g transform={s !== 1 ? `scale(${r2(s)})` : undefined}>
+      {glow > 0.01 ? <Glow x={0} y={0} r={10} c="#6fc3ff" o={glow} /> : null}
+      <path d="M-7,4 L-7,-2 L-4,1 L-2,-5 L0,-1 L2,-5 L4,1 L7,-2 L7,4 Z" fill="#3d8fe0" stroke={OL} strokeWidth={1.3} strokeLinejoin="round" />
+      <path d="M-7,4 L7,4 L7,6 L-7,6 Z" fill="#f2c14e" stroke={OL} strokeWidth={1.1} strokeLinejoin="round" />
+      <path d="M-5.5,2 L-5.5,-0.5 L-4,1 Z M5.5,2 L5.5,-0.5 L4,1 Z" fill="#9fdcff" />
+      <path d="M0,-4 L2.2,0.2 L0,4.2 L-2.2,0.2 Z" fill="#bfeaff" stroke={OL} strokeWidth={1} strokeLinejoin="round" />
+      <path d="M0,-4 L2.2,0.2 L0,0.6 Z" fill="#ffffff" opacity={0.85} />
+      <circle cx={-2} cy={-5.6} r={0.9} fill="#f2c14e" stroke={OL} strokeWidth={0.6} />
+      <circle cx={2} cy={-5.6} r={0.9} fill="#f2c14e" stroke={OL} strokeWidth={0.6} />
+    </g>
+  );
+}

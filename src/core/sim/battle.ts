@@ -306,6 +306,7 @@ function statusesOf(w: World, u: Unit): StatusKind[] {
   if (u.buffs.some((b) => b.show && b.until > t)) out.push('buffed');
   if (u.action.k === 'channel') out.push('channeling');
   if (u.dots.length) out.push('burning');
+  if (u.aghanim) out.push('aghanim');
   return out;
 }
 

@@ -121,6 +121,36 @@ try {
   await page.getByTestId('lord-option').first().waitFor({ timeout: 5000 });
   step('new game started');
 
+  // ---- mobile pass: iPhone-sized portrait viewport, touch only (no HTML5 drag-and-drop on iOS)
+  const phone = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 3,
+    isMobile: true,
+    hasTouch: true,
+  });
+  const m = await phone.newPage();
+  m.on('console', (msg) => msg.type() === 'error' && errors.push(`mobile console: ${msg.text()}`));
+  m.on('pageerror', (e) => errors.push(`mobile pageerror: ${e.message}`));
+  await m.goto(`${BASE}/?seed=7&prep=0`, { waitUntil: 'domcontentloaded' });
+  await m.getByTestId('lord-option').first().waitFor({ timeout: 15000 });
+  await shot(m, 'mobile-lord-select');
+  await m.getByTestId('lord-option').first().tap();
+  await m.getByTestId('lord-start').tap();
+  await m.getByTestId('shop-hero-offer').first().waitFor({ timeout: 10000 });
+  await shot(m, 'mobile-shop');
+  for (let i = 0; i < 2; i++) await m.getByTestId('shop-hero-offer').first().tap({ timeout: 2000 }).catch(() => {});
+  await m.getByTestId('close-shop').first().tap({ timeout: 2000 }).catch(() => {});
+  await shot(m, 'mobile-prep');
+  await m.getByTestId('ready').first().tap();
+  await m.getByTestId('battle-skip').waitFor({ timeout: 10000 });
+  await m.waitForTimeout(2500);
+  await shot(m, 'mobile-battle');
+  await m.getByTestId('battle-skip').tap();
+  await passResults(m);
+  await shot(m, 'mobile-after');
+  step('mobile round played');
+  await phone.close();
+
   await page.goto(`${BASE}/?gallery`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1500);
   await shot(page, 'gallery');

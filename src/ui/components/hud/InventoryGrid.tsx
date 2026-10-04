@@ -5,6 +5,7 @@ import { itemDef, spellDef, starColor } from '../defs.ts';
 import { dragProps, useDrop } from '../dnd.ts';
 import { ItemTip, SpellTip, tip } from '../Tooltip.tsx';
 import { useUi } from '../uiState.ts';
+import { isTouch } from './layout.ts';
 
 const MIN_CELLS = 12;
 
@@ -30,7 +31,7 @@ export function InventoryGrid() {
     <section className={`hud-inv ${drop.over ? 'drop-over' : ''}`} {...drop.props}>
       <div className="inv-head">
         Inventory
-        <small>{pend ? 'click a hero to assign · Esc' : 'drag onto a hero · right-click sells'}</small>
+        <small>{isTouch() ? (pend ? 'tap a hero to assign' : 'tap, then tap a hero') : pend ? 'click a hero to assign · Esc' : 'drag onto a hero · right-click sells'}</small>
       </div>
       <div className="inv-cells">
         {me.spellInventory.map((id, i) => {

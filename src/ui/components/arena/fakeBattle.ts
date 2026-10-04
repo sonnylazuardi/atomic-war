@@ -93,6 +93,7 @@ export function makeFakeBattle(): BattleResult {
 
   const pudge = mk('L1', 'pudge', 'left', 0, 1, { hp: 950, maxHp: 950, dmg: 72, speed: 100, level: 5 });
   const lina = mk('L2', 'lina', 'left', 2, 0, { hp: 560, maxHp: 560, dmg: 64, range: 380, ranged: true, level: 9, maxMana: 420, mana: 260 });
+  lina.status.aghanim = Infinity; // holds Aghanim's Scepter (badge + blue cast flash)
   const axe = mk('R1', 'axe', 'right', 0, 1, { hp: 880, maxHp: 880, dmg: 62, speed: 115, level: 5 });
   const drow = mk('R2', 'drow_ranger', 'right', 2, 2, { hp: 520, maxHp: 520, dmg: 52, range: 420, ranged: true, level: 13 });
   const units = [pudge, lina, axe, drow];

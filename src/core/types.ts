@@ -215,6 +215,15 @@ export interface SpellDef {
   passives?: PassiveDef[]; // passive spells (actives may also carry passives)
   /** magnitude multiplier = 1 + levelScaling * (heroLevel - 1). ~0.04..0.08 */
   levelScaling: number;
+  /**
+   * Aghanim's Scepter upgrade (like Dota). Applies while the caster has `aghanims_scepter` equipped:
+   * every field in `patch` REPLACES the base field (e.g. new effects list, lower cooldown, extra passives).
+   * Every hero signature spell has one; shop spells may too.
+   */
+  aghanim?: {
+    description: string; // shown in tooltips, e.g. "Hook pierces: hits every enemy in a line"
+    patch: Partial<Pick<SpellDef, 'effects' | 'passives' | 'cooldown' | 'manaCost' | 'castRange' | 'castPoint' | 'aoeRadius' | 'target' | 'ai'>>;
+  };
   vfx: { kind: VfxKind; duration: number; color: string };
 }
 
@@ -357,7 +366,8 @@ export type StatusKind =
   | 'invulnerable'
   | 'buffed'
   | 'channeling'
-  | 'burning';
+  | 'burning'
+  | 'aghanim'; // carries Aghanim's Scepter (spells upgraded) — drawn as a blue crown/glow
 
 export interface UnitSnapshot {
   uid: string;

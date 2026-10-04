@@ -81,6 +81,20 @@ function Vines({ t }: { t: number }) {
   );
 }
 
+/** Aghanim's Scepter carrier: small blue crown/scepter badge right of the HP bar */
+function AghsBadge({ t }: { t: number }) {
+  const glow = 0.55 + 0.25 * Math.sin(t * 4);
+  return (
+    <g transform={`translate(${BAR_W / 2 + 9},${BAR_Y + 4})`}>
+      <circle r={9.5} fill="#4fa8ff" opacity={glow * 0.35} />
+      <circle r={7.5} fill="#10203a" stroke="#6cc0ff" strokeWidth={1.4} />
+      <path d="M-4.6,2.6 L-5,-3 L-2.2,-0.6 L0,-4.4 L2.2,-0.6 L5,-3 L4.6,2.6 Z" fill="#7fd0ff" stroke="#d8f1ff" strokeWidth={0.6} strokeLinejoin="round" />
+      <rect x={-4.6} y={2.4} width={9.2} height={1.8} rx={0.6} fill="#bfe6ff" />
+      <circle cx={0} cy={-4.4} r={1} fill="#fff" />
+    </g>
+  );
+}
+
 /** small icons in a row above the bars */
 function StatusIcon({ s, x }: { s: StatusKind; x: number }) {
   const bg = (fill: string, child: ReactNode) => (
@@ -144,10 +158,13 @@ export function UnitView({ u, fx, human, battleT }: { u: UnitSnapshot; fx: BarFx
       {st.has('grave') && u.alive && <ellipse cx={0} cy={-40} rx={30} ry={46} fill="#8a4fd0" opacity={0.12 + Math.sin(battleT * 6) * 0.05} />}
       {st.has('invulnerable') && u.alive && <ellipse cx={0} cy={-40} rx={28} ry={44} fill="#fff" opacity={0.1 + Math.sin(battleT * 10) * 0.05} />}
       {st.has('spell_immune') && u.alive && (
-        <g>
-          <ellipse cx={0} cy={-40} rx={34} ry={48} fill="#ffcf3f" opacity={0.1} />
-          <ellipse cx={0} cy={-40} rx={34} ry={48} fill="none" stroke="#ffd95a" strokeWidth={2} opacity={0.55 + Math.sin(battleT * 8) * 0.2} />
-          <path d="M-20,-70 Q-6,-84 10,-80" stroke="#fff6cf" strokeWidth={2} fill="none" opacity={0.6} strokeLinecap="round" />
+        <g pointerEvents="none">
+          <ellipse cx={0} cy={-40} rx={36} ry={50} fill="#ffcf3f" opacity={0.16 + Math.sin(battleT * 5) * 0.04} />
+          <ellipse cx={0} cy={-40} rx={36} ry={50} fill="none" stroke="#ffd95a" strokeWidth={2.6} opacity={0.7 + Math.sin(battleT * 8) * 0.2} />
+          <ellipse cx={0} cy={-40} rx={30} ry={44} fill="none" stroke="#fff3b8" strokeWidth={1} opacity={0.35} />
+          {/* shimmer band sweeping up the bubble */}
+          <ellipse cx={0} cy={-40 + 40 - ((battleT * 60) % 100)} rx={30} ry={5} fill="#fff6cf" opacity={0.28} />
+          <path d="M-22,-72 Q-6,-88 12,-83" stroke="#fff6cf" strokeWidth={2.4} fill="none" opacity={0.75} strokeLinecap="round" />
         </g>
       )}
       {st.has('stunned') && u.alive && <StunStars t={battleT} />}
@@ -172,6 +189,7 @@ export function UnitView({ u, fx, human, battleT }: { u: UnitSnapshot; fx: BarFx
               {u.level}
             </text>
           </g>
+          {st.has('aghanim') && <AghsBadge t={battleT} />}
           {icons.map((s, i) => (
             <StatusIcon key={s} s={s} x={-BAR_W / 2 + 6 + i * 14} />
           ))}

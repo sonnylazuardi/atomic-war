@@ -51,8 +51,8 @@ function polarity(e: Effect): Polarity {
   }
 }
 
-/** pure damage pierces spell immunity */
-const piercesImmunity = (e: Effect) => (e.t === 'damage' || e.t === 'dot') && e.dmgType === 'pure';
+/** spell immunity blocks enemy spell effects and magical damage; physical & pure damage still land */
+const piercesImmunity = (e: Effect) => (e.t === 'damage' || e.t === 'dot') && (e.dmgType === 'pure' || e.dmgType === 'physical');
 
 function canAffect(w: World, ctx: Ctx, u: Unit, e: Effect, pol: Polarity): boolean {
   if (!u.alive) return false;
@@ -187,7 +187,9 @@ function applyEffect(w: World, ctx: Ctx, e: Effect, tgt: Tgt): void {
     case 'buff':
       for (const u of targetsFor(w, ctx, e, tgt)) {
         const d = e.duration > 0 ? durOf(ctx, e.duration) : Infinity;
-        u.buffs.push({ stat: e.stat, value: e.value * m, until: w.t + d, show: e.value > 0 });
+        // range doesn't scale with level (lvl-30 dragons would outrange the arena)
+        const v = e.stat === 'attackRange' || e.stat === 'moveSpeed' ? e.value : e.value * m;
+        u.buffs.push({ stat: e.stat, value: v, until: w.t + d, show: e.value > 0 });
         if (e.value > 0) w.status(u, 'buffed', Number.isFinite(d) ? d : 999);
       }
       return;
@@ -324,7 +326,8 @@ function applyCustom(w: World, ctx: Ctx, e: Extract<Effect, { t: 'custom' }>, tg
         break;
       }
       case 'refresh_cooldowns':
-        for (const s of u.spells) s.cd = 0;
+        // Rearm-style refresh: never resets the spell that triggered it (else it could recast every tick)
+        for (const s of u.spells) if (!(ctx.spellId && s.def.id === ctx.spellId)) s.cd = 0;
         for (const it of u.items) {
           if (ctx.itemId && it.def.id === ctx.itemId) continue;
           if (it.def.active?.when === 'cooldown') it.cd = 0;

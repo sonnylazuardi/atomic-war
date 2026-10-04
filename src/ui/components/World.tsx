@@ -47,7 +47,23 @@ export interface WorldProps {
   onBattleDone: () => void;
   /** prep: clicking a hero with pendingUpgrades > 0 (its golden beacon is lit) levels it up */
   onUpgradeHero?: (uid: string) => void;
+  /** visible region of the 1000x600 arena (default the whole arena). Mobile uses MOBILE_VIEWBOX. */
+  viewBox?: WorldViewBox;
+  /** how the viewBox fills the container (default 'slice': cover, HUD overlays the edges) */
+  fit?: 'slice' | 'meet';
 }
+
+export interface WorldViewBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export const FULL_VIEWBOX: WorldViewBox = { x: 0, y: 0, w: ARENA_W, h: ARENA_H };
+/** portrait phones: frames the floor where units stand (lanes x 290..710, feet y 130..470) incl. the
+ *  top team's sprites, HP bars and name plates (~110 above the feet). */
+export const MOBILE_VIEWBOX: WorldViewBox = { x: 180, y: 12, w: 640, h: 520 };
 
 // ---------------------------------------------------------------- timings (real seconds)
 const TP_DUR = 0.9; // teleport fx length
@@ -85,6 +101,7 @@ interface Actor {
   visibleFrom: number; // clock s
   phase: number; // idle anim desync
   pending: number; // pendingUpgrades (beacon)
+  aghs: boolean; // holds Aghanim's Scepter (badge)
   levelUpAt: number; // clock s of the last level increase (burst fx)
 }
 
@@ -194,6 +211,7 @@ function syncActors(ws: WS, heroes: OwnedHero[], quiet: boolean) {
         visibleFrom: -1,
         phase: hash(h.uid) * 3,
         pending: h.pendingUpgrades ?? 0,
+        aghs: false,
         levelUpAt: -9,
       };
       ws.actors.set(h.uid, a);
@@ -205,6 +223,7 @@ function syncActors(ws: WS, heroes: OwnedHero[], quiet: boolean) {
     if (a.src !== h) {
       if (a.src && h.level > a.level) a.levelUpAt = now;
       a.pending = h.pendingUpgrades ?? 0;
+      a.aghs = (h.items ?? []).includes('aghanims_scepter');
       a.src = h;
       a.heroId = h.heroId;
       a.level = h.level;
@@ -385,6 +404,24 @@ function returnHome(ws: WS, run: Run) {
 
 export function World(props: WorldProps) {
   const { mode, round, names, selectedUid } = props;
+  const vb = props.viewBox ?? FULL_VIEWBOX;
+  const fit = props.fit ?? 'slice';
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ w: 1000, h: 600 });
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      setBox((b) => (b.w === w && b.h === h ? b : { w, h }));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // css px per arena unit; small screens get proportionally bigger floating text / name plates
+  const pxScale = box.w > 0 && box.h > 0 ? (fit === 'meet' ? Math.min(box.w / vb.w, box.h / vb.h) : Math.max(box.w / vb.w, box.h / vb.h)) : 1;
+  const textScale = Math.min(1.7, Math.max(1, 0.95 / pxScale));
   const [, setTick] = useState(0);
   const propsRef = useRef(props);
   propsRef.current = props;
@@ -674,13 +711,13 @@ export function World(props: WorldProps) {
   };
 
   return (
-    <div className={`aw-world${dragging ? ' dragging' : ''}`} data-testid="world" data-mode={mode} data-phase={run ? run.phase : 'prep'}>
+    <div ref={rootRef} className={`aw-world${dragging ? ' dragging' : ''}${prepActive ? ' prep' : ''}`} data-testid="world" data-mode={mode} data-phase={run ? run.phase : 'prep'}>
       <style>{WORLD_CSS}</style>
       <svg
         ref={svgRef}
         className="aw-world-svg"
-        viewBox={`0 0 ${ARENA_W} ${ARENA_H}`}
-        preserveAspectRatio="xMidYMid slice"
+        viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
+        preserveAspectRatio={`xMidYMid ${fit}`}
         onPointerDown={onSvgDown}
         onPointerMove={onSvgMove}
         onPointerUp={onSvgUp}
@@ -725,6 +762,7 @@ export function World(props: WorldProps) {
                 a={a}
                 now={now}
                 selected={selectedUid === a.uid}
+                textScale={textScale}
                 dragging={ws.drag?.uid === a.uid && ws.drag.moved}
                 dropHot={dndUid === a.uid}
                 interactive={prepActive}
@@ -747,7 +785,7 @@ export function World(props: WorldProps) {
             </g>
           )}
           {pb && run && run.phase !== 'intro' && <VfxLayer effects={pb.effects} now={fxNow} />}
-          {pb && run && run.phase !== 'intro' && <TextLayer effects={pb.effects} now={fxNow} />}
+          {pb && run && run.phase !== 'intro' && <TextLayer effects={pb.effects} now={fxNow} scale={textScale} />}
           <TerrainAmbient f={ws.terrain} now={now} />
           <g pointerEvents="none">
             {ws.tps.map((t) => {
@@ -824,6 +862,7 @@ interface PrepHeroProps {
   a: Actor;
   now: number;
   selected: boolean;
+  textScale: number;
   dragging: boolean;
   dropHot: boolean;
   interactive: boolean;
@@ -832,7 +871,7 @@ interface PrepHeroProps {
   onDrop: (uid: string, e: DragEvent) => void;
 }
 
-function PrepHero({ a, now, selected, dragging, dropHot, interactive, onDown, onDragOver, onDrop }: PrepHeroProps) {
+function PrepHero({ a, now, selected, textScale, dragging, dropHot, interactive, onDown, onDragOver, onDrop }: PrepHeroProps) {
   const alpha = a.visibleFrom < 0 ? 1 : clamp01((now - a.visibleFrom) / FADE);
   if (alpha <= 0.01) return null;
   const moving = dragging || a.moveDur > 0;
@@ -852,7 +891,7 @@ function PrepHero({ a, now, selected, dragging, dropHot, interactive, onDown, on
     animT: now + a.phase,
     animDur: 0,
     alive: true,
-    statuses: [],
+    statuses: a.aghs ? ['aghanim'] : [],
   };
   const lift = dragging ? -10 : 0;
   const beacon = a.pending > 0 && !dragging;
@@ -871,7 +910,7 @@ function PrepHero({ a, now, selected, dragging, dropHot, interactive, onDown, on
           x={a.x}
           y={a.y - 108}
           textAnchor="middle"
-          fontSize={11}
+          fontSize={11 * Math.min(1.3, textScale)}
           fontWeight={700}
           fill={selected ? '#ffe28a' : '#eef2f8'}
           stroke="#000"
@@ -887,9 +926,9 @@ function PrepHero({ a, now, selected, dragging, dropHot, interactive, onDown, on
       {now - a.levelUpAt < 1.05 && <LevelUpBurst x={a.x} y={a.y} k={(now - a.levelUpAt) / 1.05} />}
       <rect
         className="aw-hero-hit"
-        x={a.x - 26}
+        x={a.x - 26 * Math.min(1.5, textScale)}
         y={a.y - 96}
-        width={52}
+        width={52 * Math.min(1.5, textScale)}
         height={104}
         fill="transparent"
         pointerEvents={interactive ? 'all' : 'none'}

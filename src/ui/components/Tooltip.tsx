@@ -1,5 +1,6 @@
 // Single global tooltip rendered inside the scaled stage (never clipped by panels).
-import { useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode, type SyntheticEvent, type TouchEvent } from 'react';
+import { isTouch } from './hud/layout.ts';
 import { create } from 'zustand';
 import type { ItemId, LordId, SpellId } from '../../core/types.ts';
 import { ATTR_INFO, CLASS_INFO, TIER_COLORS, heroDef, itemDef, lordDef, spellDef, statLines } from './defs.ts';
@@ -13,8 +14,34 @@ const useTipStore = create<TipState>()(() => ({ content: null, rect: null }));
 
 export const hideTip = () => useTipStore.setState({ content: null, rect: null });
 
-/** Spread onto any element to give it a hover tooltip. */
+let pressTimer = 0;
+let longPressed = false;
+
+/** Spread onto any element to give it a hover tooltip (long-press on touch screens). */
 export function tip(content: () => ReactNode) {
+  if (isTouch()) {
+    return {
+      onTouchStart: (e: TouchEvent<HTMLElement | SVGElement>) => {
+        const el = e.currentTarget;
+        clearTimeout(pressTimer);
+        longPressed = false;
+        pressTimer = window.setTimeout(() => {
+          longPressed = true;
+          useTipStore.setState({ content: content(), rect: el.getBoundingClientRect() });
+        }, 420);
+      },
+      onTouchEnd: () => clearTimeout(pressTimer),
+      onTouchMove: () => clearTimeout(pressTimer),
+      onTouchCancel: () => clearTimeout(pressTimer),
+      // a long-press shows info; it must not also buy / assign
+      onClickCapture: (e: SyntheticEvent) => {
+        if (!longPressed) return;
+        longPressed = false;
+        e.stopPropagation();
+        e.preventDefault();
+      },
+    };
+  }
   return {
     onMouseEnter: (e: MouseEvent<HTMLElement | SVGElement>) =>
       useTipStore.setState({ content: content(), rect: e.currentTarget.getBoundingClientRect() }),
@@ -65,7 +92,7 @@ export function TooltipLayer() {
 
 // ---------------------------------------------------------------- tooltip bodies
 
-export function SpellTip({ id }: { id: SpellId }) {
+export function SpellTip({ id, upgraded = false }: { id: SpellId; upgraded?: boolean }) {
   const s = spellDef(id);
   return (
     <div className="tip-body">
@@ -87,7 +114,29 @@ export function SpellTip({ id }: { id: SpellId }) {
         </div>
       )}
       <p>{s.description || 'No description.'}</p>
+      {s.aghanim && (
+        <div className={`tip-agh ${upgraded ? 'on' : ''}`}>
+          <span className="agh-glyph" aria-hidden>
+            <AghGlyph />
+          </span>
+          <div>
+            <div className="tip-agh-title">Aghanim's Upgrade{upgraded ? ' · active' : ''}</div>
+            <div>{s.aghanim.description}</div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+/** Blue Aghanim's Scepter mark. */
+export function AghGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14">
+      <path d="M8 1l2.4 3.2L8 7.4 5.6 4.2z" fill="#7fc4ff" stroke="#cfeaff" strokeWidth=".6" />
+      <rect x="7.2" y="7" width="1.6" height="8" rx=".6" fill="#3d86d6" />
+      <circle cx="8" cy="7.6" r="1.4" fill="#a8d8ff" />
+    </svg>
   );
 }
 
@@ -102,7 +151,7 @@ export function ItemTip({ id }: { id: ItemId }) {
             {it.name}
           </div>
           <div className="tip-sub">
-            Tier {it.tier} · <span className="gold">{it.cost}◉</span>
+            <span style={{ color: TIER_COLORS[it.tier] }}>{'★'.repeat(it.tier)}</span> · <span className="gold">${it.cost}</span>
           </div>
         </div>
       </div>
@@ -114,6 +163,19 @@ export function ItemTip({ id }: { id: ItemId }) {
         </ul>
       )}
       {it.description && <p>{it.description}</p>}
+      {it.id === 'aghanims_scepter' && (
+        <div className="tip-agh on">
+          <span className="agh-glyph" aria-hidden>
+            <AghGlyph />
+          </span>
+          <div>Upgrades the holder's spells that have an Aghanim's Upgrade (marked with a blue corner).</div>
+        </div>
+      )}
+      {it.active && it.id !== 'aghanims_scepter' && (
+        <div className="tip-foot">
+          Triggers automatically {it.active.when === 'battle_start' ? 'when the battle starts' : it.active.when === 'low_hp' ? 'at low HP' : `every ${it.active.cooldown ?? '?'}s`}
+        </div>
+      )}
     </div>
   );
 }

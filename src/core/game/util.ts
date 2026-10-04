@@ -2,7 +2,13 @@
 import { createRng, type Rng } from '../rng.ts';
 import { BENCH_SIZE, BOARD_COLS, BOARD_ROWS, boardCap } from '../constants.ts';
 import { HEROES } from '../data/heroes.ts';
-import type { BattleResult, BoardSlot, GameState, HeroId, OwnedHero, PlayerState } from '../types.ts';
+import { HERO_KITS } from '../ids.ts';
+import type { BattleResult, BoardSlot, GameState, HeroId, OwnedHero, PlayerState, SpellId } from '../types.ts';
+
+/** A spell from the hero's own Dota kit (HERO_KITS). Innate spells are lost when replaced, removed or the hero is sold. */
+export function isInnate(hero: Pick<OwnedHero, 'heroId'>, spellId: SpellId): boolean {
+  return (HERO_KITS[hero.heroId] as readonly SpellId[] | undefined)?.includes(spellId) ?? false;
+}
 
 /** Gains from this round's battles, applied in finishBattle. Extra field carried on GameState. */
 export type PendingGains = Record<string, { str: number; agi: number; int: number; kills: number }>;

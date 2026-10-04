@@ -121,6 +121,7 @@ export interface Unit {
   berserkAS: number;
   berserkRegen: number;
   trueStrike: boolean;
+  aghanim: boolean;
   perm: { damagePct: number; damageReduction: number; attackSpeedPct: number };
 
   buffs: Buff[];
@@ -235,6 +236,7 @@ export function createUnit(
     berserkAS,
     berserkRegen,
     trueStrike: customs('true_strike').length > 0,
+    aghanim: lo.aghanim,
     perm,
     buffs: [],
     auraAcc: [],

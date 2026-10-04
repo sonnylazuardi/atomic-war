@@ -11,6 +11,7 @@ export {
   boardOrder,
   firstFreeSlot,
   findHero,
+  isInnate,
   cloneState,
   type GS,
   type MatchExtras,

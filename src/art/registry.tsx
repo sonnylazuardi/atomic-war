@@ -4,6 +4,9 @@ import { heroArtGroup1 } from './heroes/group1.ts';
 import { heroArtGroup2 } from './heroes/group2.ts';
 import { shopSpellVfx } from './vfx/shopSpells.ts';
 import { signatureVfx } from './vfx/signatures.ts';
+import { kitAVfx } from './vfx/kitA.ts';
+import { kitBVfx } from './vfx/kitB.ts';
+import { kitCVfx } from './vfx/kitC.ts';
 import type { HeroArt, ProjectileArt, VfxArt, ZoneArt } from './types.ts';
 import { TEAM_COLORS, bump, clamp01, loop } from './types.ts';
 
@@ -32,9 +35,10 @@ const FallbackZone: ZoneArt = ({ t, x, y, radius }) => (
 const FallbackProjectile: ProjectileArt = () => <circle r={6} fill="#ffd36b" />;
 
 const heroArt: Partial<Record<HeroId, HeroArt>> = { ...heroArtGroup1, ...heroArtGroup2 };
-const vfx = { ...signatureVfx.vfx, ...shopSpellVfx.vfx };
-const zones = { ...signatureVfx.zones, ...shopSpellVfx.zones };
-const projectiles = { ...signatureVfx.projectiles, ...shopSpellVfx.projectiles };
+const bundles = [signatureVfx, shopSpellVfx, kitAVfx, kitBVfx, kitCVfx];
+const vfx = Object.assign({}, ...bundles.map((b) => b.vfx)) as typeof signatureVfx.vfx;
+const zones = Object.assign({}, ...bundles.map((b) => b.zones)) as typeof signatureVfx.zones;
+const projectiles = Object.assign({}, ...bundles.map((b) => b.projectiles)) as typeof signatureVfx.projectiles;
 
 export const getHeroArt = (id: HeroId): HeroArt => heroArt[id] ?? FallbackHero;
 export const getVfx = (id: SpellId): VfxArt => vfx[id] ?? FallbackVfx;

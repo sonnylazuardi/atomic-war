@@ -1,6 +1,7 @@
 // Tiny HTML5 drag-and-drop helper. The payload lives in a module variable because
 // dataTransfer contents are not readable during dragover.
 import { useRef, useState, type DragEvent } from 'react';
+import { isTouch } from './hud/layout.ts';
 import { hideTip } from './Tooltip.tsx';
 
 export type DragPayload =
@@ -26,7 +27,8 @@ if (typeof document !== 'undefined') {
 }
 
 export function dragProps(p: DragPayload | null) {
-  if (!p) return {};
+  // iOS Safari has no HTML5 drag-and-drop: touch screens use tap-to-assign instead
+  if (!p || isTouch()) return {};
   return {
     draggable: true,
     onDragStart: (e: DragEvent) => {

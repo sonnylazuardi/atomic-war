@@ -117,16 +117,29 @@ export interface Loadout {
   spells: SpellDef[]; // equipped, in slot order (cast priority), unknown ids dropped
   items: ItemDef[];
   passives: PassiveEntry[];
+  aghanim: boolean; // carries Aghanim's Scepter: spells are the patched versions
+}
+
+export const hasAghanim = (hero: OwnedHero): boolean => (hero.items ?? []).includes('aghanims_scepter');
+
+/** Spell as upgraded by Aghanim's Scepter (shallow merge of the patch over the base def). */
+export function applyAghanim(s: SpellDef): SpellDef {
+  const patch = s.aghanim?.patch;
+  if (!patch) return s;
+  const out: SpellDef = { ...s };
+  for (const [k, v] of Object.entries(patch)) if (v !== undefined) (out as unknown as Record<string, unknown>)[k] = v;
+  return out;
 }
 
 export function loadout(hero: OwnedHero): Loadout {
   const def = getHeroDef(hero.heroId);
   const level = Math.max(1, Math.min(MAX_HERO_LEVEL, Math.floor(hero.level || 1)));
+  const aghanim = hasAghanim(hero);
   const spells: SpellDef[] = [];
   for (const id of hero.spells ?? []) {
     if (!id) continue;
     const s = SPELLS[id];
-    if (s) spells.push(s);
+    if (s) spells.push(aghanim ? applyAghanim(s) : s);
   }
   const items: ItemDef[] = [];
   for (const id of hero.items ?? []) {
@@ -142,7 +155,7 @@ export function loadout(hero: OwnedHero): Loadout {
   for (const it of items) {
     for (const p of it.passives ?? []) passives.push({ p, mult: 1, spellId: null, itemId: it.id });
   }
-  return { def, level, spells, items, passives };
+  return { def, level, spells, items, passives, aghanim };
 }
 
 const combinePct = (base: number, sources: number[]): number => {

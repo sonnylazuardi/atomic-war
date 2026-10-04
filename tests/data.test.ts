@@ -142,3 +142,42 @@ describe('items', () => {
     expect(lordOnly).toEqual(['broken_sword', 'divine_sword_of_the_sun']);
   });
 });
+
+describe('aghanim upgrades', () => {
+  const ALLOWED = new Set(['effects', 'passives', 'cooldown', 'manaCost', 'castRange', 'castPoint', 'aoeRadius', 'target', 'ai']);
+
+  test('new heroes are present with their signatures', () => {
+    for (const id of ['dragon_knight', 'windranger', 'jakiro'] as const) {
+      expect(HEROES[id]).toBeDefined();
+      expect(HEROES[id].signature).toBe(SIGNATURE_SPELLS[id]);
+    }
+  });
+
+  test('every signature spell has an aghanim upgrade', () => {
+    for (const id of HERO_IDS) {
+      const agh = SPELLS[SIGNATURE_SPELLS[id]].aghanim;
+      expect(agh).toBeDefined();
+      expect(agh!.description.length).toBeGreaterThan(5);
+      expect(Object.keys(agh!.patch).length).toBeGreaterThan(0);
+    }
+  });
+
+  test('patches only use allowed keys and sane values', () => {
+    for (const s of Object.values(SPELLS)) {
+      if (!s.aghanim) continue;
+      for (const k of Object.keys(s.aghanim.patch)) expect(ALLOWED.has(k)).toBe(true);
+      expect(allFinite(s.aghanim.patch)).toBe(true);
+      const p = s.aghanim.patch;
+      if (s.kind === 'active') expect((p.effects ?? s.effects).length).toBeGreaterThan(0);
+      else expect((p.passives ?? s.passives ?? []).length).toBeGreaterThan(0);
+      if (p.cooldown !== undefined) expect(p.cooldown).toBeGreaterThan(0);
+    }
+  });
+
+  test("aghanim's scepter and black king bar are in the shop", () => {
+    expect(ITEMS.aghanims_scepter.lordOnly).toBeFalsy();
+    expect(ITEMS.black_king_bar.lordOnly).toBeFalsy();
+    const bkb = ITEMS.black_king_bar.active?.effects[0];
+    expect(bkb).toMatchObject({ t: 'custom', id: 'spell_immune' });
+  });
+});

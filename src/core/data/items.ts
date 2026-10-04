@@ -145,9 +145,9 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     glyph: '🛡️',
     tier: 3,
     cost: 3,
-    description: '+10 strength, +24 damage. Spell immune for the first 5s of battle.',
+    description: '+10 strength, +24 damage. Spell immunity for the first 6s of battle: immune to enemy magic damage and disables.',
     stats: { str: 10, damage: 24 },
-    active: { when: 'battle_start', target: 'self', effects: [{ t: 'custom', id: 'spell_immune', params: { duration: 5 } }] },
+    active: { when: 'battle_start', target: 'self', effects: [{ t: 'custom', id: 'spell_immune', params: { duration: 6 } }] },
   },
   daedalus: {
     id: 'daedalus',
@@ -195,9 +195,9 @@ export const ITEMS: Record<ItemId, ItemDef> = {
     id: 'aghanims_scepter',
     name: "Aghanim's Scepter",
     glyph: '🔷',
-    tier: 3,
+    tier: 4,
     cost: 3,
-    description: '+12 all stats, +150 HP, +150 mana, +15% spell amplification.',
+    description: "+12 all stats, +150 HP, +150 mana, +15% spell amp. Upgrades every equipped spell with its Aghanim's Scepter effect.",
     stats: { str: 12, agi: 12, int: 12, hp: 150, mana: 150, spellAmp: 15 },
   },
 

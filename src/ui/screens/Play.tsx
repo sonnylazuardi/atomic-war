@@ -6,6 +6,8 @@ import { currentDrag } from '../components/dnd.ts';
 import { clickHero, dropOnHero, triggerLord } from '../components/hud/actions.ts';
 import { Dock } from '../components/hud/Dock.tsx';
 import { InventoryGrid } from '../components/hud/InventoryGrid.tsx';
+import { useLayoutMode } from '../components/hud/layout.ts';
+import { MobileBar } from '../components/hud/MobileBar.tsx';
 import { MysteryShop } from '../components/hud/MysteryShop.tsx';
 import { PlayerList } from '../components/hud/PlayerList.tsx';
 import { ResultToast } from '../components/hud/ResultToast.tsx';
@@ -52,6 +54,10 @@ function usePrepTimer(active: boolean, round: number): number | null {
   return left;
 }
 
+/** Mobile portrait: World shows the whole arena (letterboxed) instead of the desktop slice-fit.
+ *  Passed via spread so it typechecks before and after World adds the props / MOBILE_VIEWBOX. */
+const MOBILE_WORLD = { viewBox: { x: 200, y: 70, w: 600, h: 520 }, fit: 'meet' as const };
+
 const isTyping = (t: EventTarget | null) => {
   const el = t as HTMLElement | null;
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
@@ -70,6 +76,7 @@ export function Play() {
   const selectedUid = useUi((s) => s.selectedUid);
   const lordTargeting = useUi((s) => s.lordTargeting);
   const pending = useUi((s) => s.pending);
+  const mobile = useLayoutMode() === 'mobile';
   const me = players[0]!;
   const prep = phase === 'prep';
   const battle = phase === 'battle';
@@ -191,32 +198,56 @@ export function Play() {
     };
   }, []);
 
+  const world = (
+    <World
+      mode={battle ? 'battle' : 'prep'}
+      round={round}
+      heroes={heroes}
+      homeTerrain={homeTerrain}
+      battle={battle ? humanBattle : null}
+      humanSide={humanSide}
+      hostTerrain={hostTerrain}
+      names={names}
+      selectedUid={selectedUid}
+      onSelectHero={onSelectHero}
+      onPlaceHero={onPlaceHero}
+      onDropOnHero={onDropOnHero}
+      onDropOnSlot={onDropOnSlot}
+      onBattleDone={onBattleDone}
+      {...{ onUpgradeHero }}
+      {...(mobile ? MOBILE_WORLD : {})}
+    />
+  );
+  const onToggleShop = () => setShopOpen((o) => !o);
+
+  if (mobile) {
+    return (
+      <div className={`screen mplay phase-${phase} ${lordTargeting ? 'lord-targeting' : ''} ${pending ? 'assigning' : ''}`}>
+        <TopCenter timer={timer} enemy={enemyName} onReady={prep ? () => readyForBattle() : null} />
+        <div className="m-world">{world}</div>
+        <div className="m-scroll">
+          <PlayerList opponent={oppId} />
+          <MobileBar />
+          <Dock shopOpen={shopOpen} onToggleShop={onToggleShop} />
+          <UnitCard />
+          <Roster />
+          <InventoryGrid />
+        </div>
+        {prep && shopOpen && <MysteryShop mobile onClose={() => setShopOpen(false)} />}
+        {phase === 'results' && <ResultToast />}
+        {phase === 'game_over' && <GameOver />}
+      </div>
+    );
+  }
+
   return (
     <div className={`screen play phase-${phase} ${lordTargeting ? 'lord-targeting' : ''} ${pending ? 'assigning' : ''}`}>
-      <div className="play-world">
-        <World
-          mode={battle ? 'battle' : 'prep'}
-          round={round}
-          heroes={heroes}
-          homeTerrain={homeTerrain}
-          battle={battle ? humanBattle : null}
-          humanSide={humanSide}
-          hostTerrain={hostTerrain}
-          names={names}
-          selectedUid={selectedUid}
-          onSelectHero={onSelectHero}
-          onPlaceHero={onPlaceHero}
-          onDropOnHero={onDropOnHero}
-          onDropOnSlot={onDropOnSlot}
-          onBattleDone={onBattleDone}
-          {...{ onUpgradeHero }}
-        />
-      </div>
+      <div className="play-world">{world}</div>
       <div className="hud">
         <TopCenter timer={timer} enemy={enemyName} onReady={prep ? () => readyForBattle() : null} />
         <PlayerList opponent={oppId} />
         <Roster />
-        <Dock shopOpen={shopOpen} onToggleShop={() => setShopOpen((o) => !o)} />
+        <Dock shopOpen={shopOpen} onToggleShop={onToggleShop} />
         <div className="hud-unit-slot">
           <UnitCard />
         </div>

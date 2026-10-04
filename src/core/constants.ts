@@ -8,7 +8,7 @@ export const ARENA_H = 600;
 // Formation: col = depth (0 = front row, nearest the center line), row = lane across the arena.
 export const BOARD_COLS = 3;
 export const BOARD_ROWS = 4;
-export const BENCH_SIZE = 4;
+export const BENCH_SIZE = 0; // no bench: like the real game, every hero you own stands in the arena
 
 export const SIM_HZ = 20;
 export const SIM_DT = 1 / SIM_HZ;
@@ -16,7 +16,7 @@ export const BATTLE_TIME_LIMIT = 45; // seconds
 
 export const MAX_HERO_LEVEL = 30;
 export const LEVELS_PER_UPGRADE = 4;
-export const ITEM_SLOTS = 3;
+export const ITEM_SLOTS = 6; // Items tab of the hero roster
 export const MAX_SHOP_LEVEL = 6; // tavern
 export const HERO_OFFERS = 5; // real game shows 5 heroes in the Mystery shop
 /** seconds of preparation before auto-ready (UI timer). `?prep=0` disables it. */
@@ -42,7 +42,9 @@ export const SELL_ITEM = 1;
 export const LORD_CHOICES = 4; // "Choose Your Summoner" shows 4
 
 export const incomeForRound = (round: number) => 5 + Math.min(round, 5);
-export const boardCap = (round: number) => Math.min(6, 2 + Math.floor(round / 3));
+/** max heroes in the arena — fixed at 5 (the real game's limit); buying is otherwise only limited by gold */
+export const MAX_HEROES = 5;
+export const boardCap = (_round: number) => MAX_HEROES;
 export const shopUpgradeCost = (level: number) => 2 + 2 * level;
 /** offers of spells and items each — one more per tavern level: 2, 3, 4, 5, 5, 5 */
 export const offersForShopLevel = (level: number) => Math.min(5, 1 + level);
@@ -53,8 +55,9 @@ export const maxItemTier = (shopLevel: number) => {
   row.forEach((p, i) => p > 0 && (max = i + 1));
   return max;
 };
-/** 2 at lvl 1, 3 at lvl 10, 4 at lvl 20 (slot 0 = signature) */
-export const spellSlotsForLevel = (level: number) => (level >= 20 ? 4 : level >= 10 ? 3 : 2);
+/** Skills tab of the hero roster: 5 slots from level 1 (slot 0 = signature, fixed) */
+export const SPELL_SLOTS = 5;
+export const spellSlotsForLevel = (_level: number) => SPELL_SLOTS;
 /** damage the loser takes */
 export const lossDamage = (round: number, survivorLevels: number[]) =>
   2 + round + survivorLevels.reduce((s, l) => s + 1 + Math.floor(l / 10), 0);

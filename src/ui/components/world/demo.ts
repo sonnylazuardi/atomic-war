@@ -22,5 +22,5 @@ export function fakeOwnedHero(uid: string, heroId: HeroId, level: number, slot: 
 /** the human's board in makeFakeBattle() for each side */
 export const fakeBattleHeroes = (side: 'left' | 'right'): OwnedHero[] =>
   side === 'left'
-    ? [fakeOwnedHero('L1', 'pudge', 5, { col: 0, row: 1 }), fakeOwnedHero('L2', 'lina', 9, { col: 2, row: 0 })]
+    ? [fakeOwnedHero('L1', 'pudge', 5, { col: 0, row: 1 }), { ...fakeOwnedHero('L2', 'lina', 9, { col: 2, row: 0 }), items: ['aghanims_scepter', null, null] }]
     : [fakeOwnedHero('R1', 'axe', 5, { col: 0, row: 1 }), fakeOwnedHero('R2', 'drow_ranger', 13, { col: 2, row: 2 })];
