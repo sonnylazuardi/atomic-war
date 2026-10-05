@@ -12,7 +12,7 @@ export const API_PREFIX = '/api/atomic';
 /** timings the server uses for its phase deadlines (seconds) */
 export const MP_TIMINGS = {
   lordSelect: 30,
-  prep: 40,
+  prep: 32,
   battleExtra: 4, // intro + outro on top of the longest battle replay
   battleMax: 50,
   results: 4,

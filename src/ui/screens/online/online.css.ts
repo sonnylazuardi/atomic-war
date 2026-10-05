@@ -23,6 +23,12 @@ export const ONLINE_CSS = `
 .btn-gold { height: 50px; font-family: var(--font-head); font-size: 18px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase;
   color: #2a1a02; border: 1px solid #ffe39a; background: linear-gradient(180deg, #ffd977, #c98d1d); box-shadow: 0 0 16px rgba(255,207,90,.3); }
 .btn-gold:hover:not(:disabled) { background: linear-gradient(180deg, #ffe39a, #d99c28); border-color: #fff0c4; }
+.ol-codex-link { align-self: center; display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 16px; margin-top: 2px;
+  border-radius: 99px; border: 1px solid rgba(201,164,92,.45); background: rgba(13,8,20,.55); color: var(--bronze-hi);
+  font: 700 13px var(--font-head); letter-spacing: .12em; text-transform: uppercase; text-decoration: none; cursor: pointer;
+  transition: color .12s, border-color .12s, background .12s; }
+.ol-codex-link:hover { color: var(--gold); border-color: var(--gold); background: rgba(40,28,10,.6); }
+.ol-codex-link:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .ol-panel { width: min(560px, 100%); }
 .ol-panel.wide { width: min(980px, 100%); }
 .ol-head { display: flex; align-items: center; gap: 10px; width: min(980px, 100%); flex-wrap: wrap; }

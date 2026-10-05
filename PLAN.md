@@ -163,7 +163,7 @@ a generic arena. The real game is ONE persistent world view with a HUD on top.
 25. **Tavern ★ odds.** Every shop offer first rolls a star from `TAVERN_ODDS[tavernLevel]`, then picks
     content of that star. Heroes/spells carry `stars` 1..5; items use `tier` 1..6 (6★ = top items).
     Tavern max level 6.
-26. **Prep timer.** Fixed 40 s preparation per round, no Ready button (`?prep=N` shortens it for tests); results auto-advance after 4 s. The deadline lives in game state so a multiplayer server can drive one clock.
+26. **Prep timer.** Fixed 32 s preparation per round, no Ready button (`?prep=N` shortens it for tests); results auto-advance after 4 s. The deadline lives in game state so a multiplayer server can drive one clock.
     After a battle: a short result banner (−HP), then auto-continue to the next preparation.
 
 | v2 agent | Owns |

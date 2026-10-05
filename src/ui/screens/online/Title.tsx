@@ -6,6 +6,7 @@ import { goOnline, useNet } from '../../../net/session.ts';
 import { useMode } from '../../mode.ts';
 import { useClock } from '../../useClock.ts';
 import { LobbyShell } from './Shell.tsx';
+import { CODEX_PATH, openCodex } from '../codex/route.ts';
 
 function Fig({ id, t, flip }: { id: LordId; t: number; flip?: boolean }) {
   const Art = getLordArt(id);
@@ -18,6 +19,22 @@ function Fig({ id, t, flip }: { id: LordId; t: number; flip?: boolean }) {
         </g>
       </svg>
     </div>
+  );
+}
+
+/** small open-book glyph for the Gallery link */
+function BookIcon() {
+  return (
+    <svg viewBox="0 0 20 16" width="18" height="14" aria-hidden>
+      <path
+        d="M10 3.2C8.2 1.8 5.6 1.2 1.5 1.5v11.6c4.1-.3 6.7.3 8.5 1.7 1.8-1.4 4.4-2 8.5-1.7V1.5c-4.1-.3-6.7.3-8.5 1.7z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M10 3.2v11.6" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
   );
 }
 
@@ -44,6 +61,19 @@ export function Title() {
         <button className="btn btn-gold" data-testid="title-online" onClick={goOnline}>
           Play Online
         </button>
+        <a
+          className="ol-codex-link"
+          href={CODEX_PATH}
+          data-testid="title-gallery"
+          onClick={(e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // new tab / window: let the browser handle it
+            e.preventDefault();
+            openCodex();
+          }}
+        >
+          <BookIcon />
+          Gallery
+        </a>
         {user && (
           <div className="ol-note" style={{ textAlign: 'center' }}>
             Signed in as <b>{user.name ?? user.email}</b>

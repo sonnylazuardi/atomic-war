@@ -11,6 +11,8 @@ const server = Bun.serve({
   development: dev ? { hmr: true, console: true } : false,
   routes: {
     '/': index,
+    '/gallery': index,
+    '/gallery/': index, // player-facing hero/lord/item gallery (SPA route; Pages serves index.html for unknown paths)
     '/api/*': api.fetch,
   },
   fetch: () => new Response('Not found', { status: 404 }),
