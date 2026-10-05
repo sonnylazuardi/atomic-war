@@ -13,7 +13,8 @@ import type {
 import { teamDirY } from '../constants.ts';
 import { BATTLE_TIME_LIMIT, SIM_DT, slotToArena } from '../constants.ts';
 import { createRng } from '../rng.ts';
-import { createUnit, refreshStats, type SpellSlot, type Tgt, type Unit } from './unit.ts';
+import { createUnit, isHidden, refreshStats, type SpellSlot, type Tgt, type Unit } from './unit.ts';
+import { asPct } from '../stats.ts';
 import { BODY, dist, World } from './world.ts';
 import { aiAllows, backlineOf, isEnemyRule, pickAttackTarget, resolveTarget } from './targeting.ts';
 import { applyEffects, omniStep, stepProjectiles, stepZones, type Ctx } from './effects.ts';
@@ -93,7 +94,7 @@ function releaseCast(w: World, u: Unit): void {
   const s = a.spell;
   let tgt = a.tgt;
   const p = tgt.primary;
-  if (p && p !== u && (!p.alive || (p.team !== u.team && (p.invulnUntil > w.t || p.immuneUntil > w.t)))) {
+  if (p && p !== u && (!p.alive || (p.team !== u.team && (isHidden(p, w.t) || p.immuneUntil > w.t)))) {
     const re = resolveTarget(w, u, s.def.target, s.def.castRange ? s.def.castRange * 1.25 : 0, s.def.aoeRadius);
     if (!re) {
       u.action = { k: 'none' };
@@ -123,6 +124,13 @@ function releaseCast(w: World, u: Unit): void {
   });
   const ctx: Ctx = { caster: u, spellId: s.def.id, itemId: null, mult: s.mult, spell: true };
   applyEffects(w, ctx, s.def.effects, tgt);
+  // Invoker lord: chance to refund mana + cooldown
+  const refund = w.teamMods[u.team].refundChance ?? 0;
+  if (refund > 0 && u.alive && w.rng.chance(Math.min(100, asPct(refund)) / 100)) {
+    u.mana = Math.min(u.cur.maxMana, u.mana + cost);
+    s.cd = 0;
+    w.proc(u, u, { spellId: s.def.id, itemId: null }, { x: u.x, y: u.y }); // dst === src marks a refund (World shows "REFRESH!")
+  }
 }
 
 // ---------------------------------------------------------------- items
@@ -145,7 +153,8 @@ function stepItems(w: World, u: Unit, start: boolean): void {
     const a = it.def.active;
     if (!a || !u.alive) continue;
     if (a.when === 'battle_start') {
-      if (start && !it.used) {
+      // hypnotized units use their battle-start items when they wake up
+      if (!it.used && u.hypnoUntil <= w.t) {
         it.used = true;
         fireItem(w, u, k);
       }
@@ -172,6 +181,21 @@ function stepUnit(w: World, u: Unit): void {
   if (u.attackCd > 0) u.attackCd -= DT;
   for (const s of u.spells) if (s.cd > 0) s.cd -= DT;
 
+  if (u.hypno) {
+    if (u.hypnoUntil > t) {
+      // asleep: untargetable, can't act, regenerates
+      u.hp = Math.min(u.cur.maxHp, u.hp + (u.cur.maxHp * u.hypno.hpPctPerSec * DT) / 100);
+      return;
+    }
+    const h = u.hypno;
+    u.hypno = null;
+    if (h.damagePct) u.buffs.push({ stat: 'damagePct', value: h.damagePct, until: Infinity, show: true });
+    w.status(u, 'buffed', 999);
+    if (h.immuneAfter > 0) {
+      u.immuneUntil = Math.max(u.immuneUntil, t + h.immuneAfter);
+      w.status(u, 'spell_immune', h.immuneAfter);
+    }
+  }
   const a = u.action;
   if (a.k === 'omni') {
     if (t + 1e-9 >= a.next) omniStep(w, u);
@@ -198,7 +222,7 @@ function stepUnit(w: World, u: Unit): void {
   }
   if (a.k === 'attack') {
     const tg = a.target;
-    if (hexed || !tg.alive || tg.invulnUntil > t) {
+    if (hexed || !tg.alive || isHidden(tg, t)) {
       u.action = { k: 'none' };
       u.attackCd = Math.min(u.attackCd, 0.1);
     } else {
@@ -280,6 +304,7 @@ function updateAnim(w: World, u: Unit): void {
   if (!u.alive) return setAnim(u, 'dead', 0);
   const a = u.action;
   if (a.k === 'omni') return;
+  if (u.hypnoUntil > w.t) return setAnim(u, 'idle', 0);
   if (u.stunUntil > w.t) return setAnim(u, 'hurt', 0);
   if (a.k === 'cast') return setAnim(u, 'cast', (a.spell.def.castPoint || 0) + 0.2);
   if (a.k === 'channel') return setAnim(u, 'cast', 0);
@@ -307,6 +332,8 @@ function statusesOf(w: World, u: Unit): StatusKind[] {
   if (u.action.k === 'channel') out.push('channeling');
   if (u.dots.length) out.push('burning');
   if (u.aghanim) out.push('aghanim');
+  if (u.hypnoUntil > t) out.push('hypnotized');
+  if (u.invisUntil > t) out.push('invisible');
   return out;
 }
 
@@ -354,21 +381,24 @@ export const runBattle: RunBattle = (left, right, seed, opts) => {
   const frames: BattleFrame[] = [];
 
   const seen = new Set<string>();
-  const spawn = (hero: OwnedHero, team: Team, idx: number, mods: BattleTeamInput['mods']) => {
+  const spawn = (hero: OwnedHero, team: Team, idx: number, input: BattleTeamInput) => {
     let uid = hero.uid || `${team}-${idx}`;
     while (seen.has(uid)) uid += '#';
     seen.add(uid);
     const slot = hero.slot ?? { col: Math.floor(idx / 3) % 4, row: idx % 3 };
     const pos = slotToArena(slot.col, slot.row, team);
-    const u = createUnit(hero, uid, w.units.length, team, mods ?? {}, pos);
+    const hm = hero.uid ? input.heroMods?.[hero.uid] : undefined;
+    const u = createUnit(hero, uid, w.units.length, team, input.mods ?? {}, pos, hm ?? {});
     w.units.push(u);
-    w.gains[uid] = { str: 0, agi: 0, int: 0, kills: 0 };
+    if (u.hypnoUntil > 0) w.status(u, 'hypnotized', u.hypnoUntil);
+    if (!hero.summon) w.gains[uid] = { str: 0, agi: 0, int: 0, kills: 0 }; // summons never keep gains
     w.damageDealt[uid] = 0;
   };
   const lh = heroesOf(left);
   const rh = heroesOf(right);
-  lh.forEach((h, i) => spawn(h, 'left', i, left.mods));
-  rh.forEach((h, i) => spawn(h, 'right', i, right.mods));
+  w.teamMods = { left: left?.mods ?? {}, right: right?.mods ?? {} };
+  lh.forEach((h, i) => spawn(h, 'left', i, left));
+  rh.forEach((h, i) => spawn(h, 'right', i, right));
 
   const finish = (winner: Team | 'draw'): BattleResult => {
     w.emit({ t: w.t, kind: 'end', winner });
@@ -410,7 +440,7 @@ export const runBattle: RunBattle = (left, right, seed, opts) => {
   for (const u of order) {
     if (u.cls !== 'assassin') continue;
     w.schedule(0.25, () => {
-      if (!u.alive || u.stunUntil > w.t || u.action.k !== 'none') return;
+      if (!u.alive || u.stunUntil > w.t || u.hypnoUntil > w.t || u.action.k !== 'none') return;
       const tg = backlineOf(w.attackable(u));
       if (!tg) return;
       u.x = tg.x; // land behind the target, on the far side from the center line
@@ -420,6 +450,22 @@ export const runBattle: RunBattle = (left, right, seed, opts) => {
       u.target = tg;
       u.lockTarget = true;
       w.proc(u, tg, { spellId: null, itemId: null }, { x: u.x, y: u.y });
+      w.onLeap(u);
+    });
+  }
+  // Zeus lord: opening lightning bolts on random enemies
+  for (const side of ['left', 'right'] as const) {
+    const os = w.teamMods[side].openingStrike;
+    if (!os || !(os.targets > 0) || !(os.damage > 0)) continue;
+    w.schedule(0.6, () => {
+      const own = w.units.filter((u) => u.alive && u.team === side);
+      if (own.length === 0) return;
+      const src = own.reduce((b, u) => (u.level * 1e6 + u.cur.maxHp > b.level * 1e6 + b.cur.maxHp ? u : b));
+      const foes = w.rng.shuffle(w.units.filter((u) => u.alive && u.team !== side && !isHidden(u, w.t)));
+      for (const f of foes.slice(0, Math.round(os.targets))) {
+        w.emit({ t: w.t, kind: 'cast', src: src.uid, spellId: 'lightning_bolt', dst: f.uid, from: { x: src.x, y: src.y }, to: { x: f.x, y: f.y }, radius: 0 });
+        w.dealDamage(src, f, os.damage, 'magical', {});
+      }
     });
   }
   for (const u of order) stepItems(w, u, true);

@@ -8,6 +8,7 @@ import type {
   HeroClass,
   HeroDef,
   HeroId,
+  HeroMods,
   ItemDef,
   ItemId,
   OwnedHero,
@@ -122,6 +123,13 @@ export interface Unit {
   berserkRegen: number;
   trueStrike: boolean;
   aghanim: boolean;
+  summon: boolean;
+  /** Naga lord: asleep (untargetable, damage-immune, idle) until hypnoUntil, then wakes once */
+  hypnoUntil: number;
+  hypno: { hpPctPerSec: number; damagePct: number; immuneAfter: number } | null;
+  invisUntil: number;
+  invisOnKill: number;
+  headshot: { chance: number; damage: number; knockback: number } | null;
   perm: { damagePct: number; damageReduction: number; attackSpeedPct: number };
 
   buffs: Buff[];
@@ -169,9 +177,11 @@ export function createUnit(
   team: Team,
   mods: TeamMods,
   pos: Vec,
+  heroMods: HeroMods = {},
 ): Unit {
-  const lo = loadout(hero);
-  const base = computeFromLoadout(hero, lo, mods);
+  const lo = loadout(hero, heroMods);
+  const base = computeFromLoadout(hero, lo, mods, heroMods);
+  const hyp = heroMods.hypnotize;
   const ps = lo.passives;
   const of = (t: PassiveDef['t']) => ps.filter((pe) => pe.p.t === t);
   const customs = (id: string) => ps.filter((pe) => pe.p.t === 'custom' && pe.p.id === id);
@@ -237,6 +247,12 @@ export function createUnit(
     berserkRegen,
     trueStrike: customs('true_strike').length > 0,
     aghanim: lo.aghanim,
+    summon: !!hero.summon,
+    hypnoUntil: hyp && hyp.seconds > 0 ? hyp.seconds : 0,
+    hypno: hyp && hyp.seconds > 0 ? { hpPctPerSec: hyp.hpPctPerSec || 0, damagePct: hyp.damagePct || 0, immuneAfter: hyp.immuneAfter || 0 } : null,
+    invisUntil: 0,
+    invisOnKill: Math.max(0, heroMods.invisibleOnKill ?? 0),
+    headshot: heroMods.headshot && heroMods.headshot.chance > 0 ? { ...heroMods.headshot } : null,
     perm,
     buffs: [],
     auraAcc: [],
@@ -359,3 +375,6 @@ export function refreshStats(u: Unit, t: number): void {
 }
 
 export const pctOf = asPct;
+
+/** Can't be picked by enemy targeting (attacks, spells, bounces): invulnerable, hypnotized or invisible. */
+export const isHidden = (u: Unit, t: number): boolean => u.invulnUntil > t || u.hypnoUntil > t || u.invisUntil > t;

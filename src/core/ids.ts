@@ -89,14 +89,19 @@ export type KitSpellIdC = (typeof KIT_SPELL_IDS_C)[number];
 /** spells authored in src/core/data/spells.ts (hero signatures + the original shop spells) */
 export type BaseSpellId = (typeof SIGNATURE_SPELLS)[HeroId] | (typeof SHOP_SPELL_IDS)[number];
 
+/** spells only lords/items grant (SpellDef.lordOnly — never rolled in the shop) */
+export const LORD_SPELL_IDS = ['charge_of_darkness', 'sleight_of_fist'] as const;
+export type LordSpellId = (typeof LORD_SPELL_IDS)[number];
+
 export const SPELL_IDS = [
   ...Object.values(SIGNATURE_SPELLS),
   ...SHOP_SPELL_IDS,
   ...KIT_SPELL_IDS_A,
   ...KIT_SPELL_IDS_B,
   ...KIT_SPELL_IDS_C,
+  ...LORD_SPELL_IDS,
 ] as const;
-export type SpellId = BaseSpellId | KitSpellIdA | KitSpellIdB | KitSpellIdC;
+export type SpellId = BaseSpellId | KitSpellIdA | KitSpellIdB | KitSpellIdC | LordSpellId;
 
 /**
  * Every hero's default abilities, like Dota: [Q, W, E, R] — three normal skills then the ULTIMATE
@@ -158,20 +163,31 @@ export const ITEM_IDS = [
   // tier 5
   'radiance',
   'divine_rapier',
-  // lord-only (Ursa lord forge)
+  // lord-only (Ember Spirit forge): Broken Sword -> 9 forges -> Flame Sword -> 9 more -> Divine Sword of the Sun
   'broken_sword',
+  'flame_sword',
   'divine_sword_of_the_sun',
 ] as const;
 export type ItemId = (typeof ITEM_IDS)[number];
 
+// Real Atomic War lords (2025 versions). The Forge moved from Ursa to Ember Spirit like the live game.
 export const LORD_IDS = [
   'alchemist',
-  'ursa_lord',
   'pudge_lord',
   'bounty_hunter',
   'omniknight',
   'tinker_lord',
-  'axe_lord',
-  'rubick',
+  'axe_lord', // Culling Blade
+  'rubick', // Father's Promise
+  'ember_spirit', // Forge
+  'naga_siren', // Song of the Siren
+  'spirit_breaker', // Charge
+  'riki', // Cloak and Dagger
+  'invoker', // Elemental Spirit
+  'sniper_lord', // Take Aim
+  'zeus_lord', // Lightning Bolt
+  'juggernaut_lord', // Heroic Reinforcement
+  'luna', // Lunar Blessing
+  'phantom_assassin_lord', // Phantom Strike
 ] as const;
 export type LordId = (typeof LORD_IDS)[number];

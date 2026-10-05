@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { HERO_IDS, ITEM_IDS, SIGNATURE_SPELLS, SPELL_IDS } from '../src/core/ids.ts';
+import { HERO_IDS, ITEM_IDS, LORD_SPELL_IDS, SIGNATURE_SPELLS, SPELL_IDS } from '../src/core/ids.ts';
 import { HEROES } from '../src/core/data/heroes.ts';
 import { SPELLS } from '../src/core/data/spells.ts';
 import { ITEMS } from '../src/core/data/items.ts';
+import { LORD_SPELLS } from '../src/core/data/lordSpells.ts';
 
 const pos = (n: number) => Number.isFinite(n) && n > 0;
 const nonNeg = (n: number) => Number.isFinite(n) && n >= 0;
@@ -134,12 +135,39 @@ describe('items', () => {
       expect(Object.values(ITEMS).some((i) => i.tier === tier && !i.lordOnly)).toBe(true);
   });
 
-  test('only the two lord items are lordOnly', () => {
+  test('only the three forge items are lordOnly', () => {
     const lordOnly = Object.values(ITEMS)
       .filter((i) => i.lordOnly)
       .map((i) => i.id)
       .sort();
-    expect(lordOnly).toEqual(['broken_sword', 'divine_sword_of_the_sun']);
+    expect(lordOnly).toEqual(['broken_sword', 'divine_sword_of_the_sun', 'flame_sword']);
+    for (const id of lordOnly) expect(ITEMS[id as keyof typeof ITEMS].tier).toBe(6);
+  });
+
+  test('granted spells exist', () => {
+    for (const it of Object.values(ITEMS)) for (const sp of it.grantsSpells ?? []) expect(SPELLS[sp]).toBeDefined();
+    expect(ITEMS.flame_sword.grantsSpells).toContain('sleight_of_fist');
+    expect(ITEMS.divine_sword_of_the_sun.grantsSpells).toContain('sleight_of_fist');
+    expect(ITEMS.divine_sword_of_the_sun.passives).toContainEqual({ t: 'custom', id: 'true_strike' });
+  });
+});
+
+describe('lord spells', () => {
+  test('every lord spell is defined, lordOnly, 4★, with an aghanim', () => {
+    expect(Object.keys(LORD_SPELLS).sort()).toEqual([...LORD_SPELL_IDS].sort());
+    for (const id of LORD_SPELL_IDS) {
+      const sp = SPELLS[id];
+      expect(sp).toBe(LORD_SPELLS[id]);
+      expect(sp.id).toBe(id);
+      expect(sp.lordOnly).toBe(true);
+      expect(sp.stars).toBe(4);
+      expect(sp.aghanim).toBeDefined();
+    }
+  });
+
+  test('only lord spells are lordOnly', () => {
+    const lordOnly = Object.values(SPELLS).filter((s) => s.lordOnly).map((s) => s.id).sort();
+    expect(lordOnly).toEqual([...LORD_SPELL_IDS].sort());
   });
 });
 

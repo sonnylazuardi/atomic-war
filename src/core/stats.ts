@@ -6,6 +6,7 @@ import type {
   HeroDef,
   HeroId,
   ItemDef,
+  HeroMods,
   ItemId,
   OwnedHero,
   PassiveDef,
@@ -131,7 +132,7 @@ export function applyAghanim(s: SpellDef): SpellDef {
   return out;
 }
 
-export function loadout(hero: OwnedHero): Loadout {
+export function loadout(hero: OwnedHero, heroMods?: HeroMods): Loadout {
   const def = getHeroDef(hero.heroId);
   const level = Math.max(1, Math.min(MAX_HERO_LEVEL, Math.floor(hero.level || 1)));
   const aghanim = hasAghanim(hero);
@@ -146,6 +147,14 @@ export function loadout(hero: OwnedHero): Loadout {
     if (!id) continue;
     const it = ITEMS[id];
     if (it) items.push(it);
+  }
+  // spells granted for this battle (lord HeroMods, items) go after the hero's own spells
+  const granted: SpellId[] = [...(heroMods?.grantSpells ?? [])];
+  for (const it of items) granted.push(...(it.grantsSpells ?? []));
+  for (const id of granted) {
+    const s = SPELLS[id];
+    if (!s || spells.some((x) => x.id === id)) continue;
+    spells.push(aghanim ? applyAghanim(s) : s);
   }
   const passives: PassiveEntry[] = [];
   for (const s of spells) {
@@ -165,11 +174,11 @@ const combinePct = (base: number, sources: number[]): number => {
   return 100 * (1 - keep);
 };
 
-export function computeStats(hero: OwnedHero, mods?: TeamMods): CombatStats {
-  return computeFromLoadout(hero, loadout(hero), mods ?? {});
+export function computeStats(hero: OwnedHero, mods?: TeamMods, heroMods?: HeroMods): CombatStats {
+  return computeFromLoadout(hero, loadout(hero, heroMods), mods ?? {}, heroMods);
 }
 
-export function computeFromLoadout(hero: OwnedHero, lo: Loadout, mods: TeamMods): CombatStats {
+export function computeFromLoadout(hero: OwnedHero, lo: Loadout, mods: TeamMods, hm: HeroMods = {}): CombatStats {
   const def = lo.def;
   const lv = lo.level;
   const add = zeroStats();
@@ -189,6 +198,10 @@ export function computeFromLoadout(hero: OwnedHero, lo: Loadout, mods: TeamMods)
     if (p.t === 'stat' && isStatKey(p.stat)) addStat(p.stat, p.value * pe.mult);
     else if (p.t === 'evasion') evSrc.push(asPct(p.pct));
   }
+  // permanent flat bonuses on the owned hero (lord abilities)
+  if (hero.bonus) for (const k of STAT_KEYS) addStat(k, hero.bonus[k] ?? 0);
+  add.attackRange += hm.attackRange ?? 0;
+  add.moveSpeed += hm.moveSpeed ?? 0;
   const stacks = hero.stacks ?? { str: 0, agi: 0, int: 0 };
   const str = def.baseStr + def.gainStr * (lv - 1) + (stacks.str || 0) + add.str;
   const agi = def.baseAgi + def.gainAgi * (lv - 1) + (stacks.agi || 0) + add.agi;
@@ -196,7 +209,8 @@ export function computeFromLoadout(hero: OwnedHero, lo: Loadout, mods: TeamMods)
   const attrs: Record<Attr, number> = { str, agi, int };
 
   let damage = def.baseDamage + attrs[def.primary] + add.damage;
-  damage *= 1 + (mods.damagePct ?? 0) / 100;
+  if (hm.agiDamageMult) damage += Math.floor(hm.agiDamageMult * agi);
+  damage *= (1 + (mods.damagePct ?? 0) / 100) * (1 + (hm.damagePct ?? 0) / 100);
   const armor = def.baseArmor + agi * 0.17 + add.armor + (mods.armor ?? 0);
   const attackSpeed = Math.max(20, Math.min(700, 100 + agi + add.attackSpeed + (mods.attackSpeed ?? 0)));
   const maxHp = Math.max(1, (BASE_HP + str * 20 + add.hp) * (1 + (mods.hpPct ?? 0) / 100));

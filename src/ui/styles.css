@@ -2846,3 +2846,31 @@ body {
   color: var(--radiant);
   font-weight: 900;
 }
+
+/* lord ability bound to a hero (Naga / Spirit Breaker / Luna) */
+.rr-bound {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0 2px;
+  font-size: 10px;
+  line-height: 13px;
+  border-bottom-left-radius: 3px;
+  background: color-mix(in srgb, var(--lord-c, #c9a45c) 75%, #000);
+  box-shadow: 0 0 6px var(--lord-c, #c9a45c);
+  color: #fff;
+}
+.rr-bound b {
+  font-size: 9px;
+  font-weight: 800;
+}
+.lord-status {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  color: var(--gold);
+  font-weight: 600;
+}

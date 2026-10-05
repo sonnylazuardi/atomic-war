@@ -22,7 +22,7 @@ import type {
   Team,
 } from '../types.ts';
 import { botPickLord, botPrepM } from './bots.ts';
-import { applyLordPick, lordIncomeBonus, onLeavePrep, onRoundStart, teamModsFor } from './lords.ts';
+import { applyLordPick, heroModsFor, lordIncomeBonus, lordSummon, onLeavePrep, onRoundStart, teamModsFor } from './lords.ts';
 import { emptyShop, rollShop } from './shop.ts';
 import { fail, fighters, log, pure, withRng, type GS, type PendingGains } from './util.ts';
 
@@ -201,8 +201,13 @@ export function autoPickLordsM(s: GS) {
 
 // ---------------------------------------------------------------- battles
 
+/** One side's battle input: board heroes + lord summon, team mods and per-hero lord mods.
+ *  The single source for both readyForBattle and pairingInputs (client replays must match exactly). */
 function teamInput(s: GameState, p: PlayerState): BattleTeamInput {
-  return { playerId: p.id, heroes: structuredClone(fighters(p, s.round)), mods: teamModsFor(p) };
+  const heroes = structuredClone(fighters(p, s.round));
+  const summon = lordSummon(p, s.round);
+  if (summon) heroes.push(summon);
+  return { playerId: p.id, heroes, mods: teamModsFor(p), heroMods: heroModsFor(p, s.round) };
 }
 
 /** The exact battle inputs readyForBattle used for `pairing` (ghost side = copy of that player's team).
@@ -295,6 +300,7 @@ export function readyForBattleM(s: GS, opts: ReadyOptions = {}) {
     const pick = (team: BattleTeamInput): PendingGains => {
       const out: PendingGains = {};
       for (const h of team.heroes) {
+        if (h.summon) continue; // lord summons keep nothing
         const g = res.gains[h.uid];
         if (g) out[h.uid] = { ...g };
       }
@@ -420,7 +426,7 @@ export function nextRoundM(s: GS) {
   for (const p of s.players) {
     if (!p.alive) continue;
     p.coins = incomeForRound(s.round) + streakBonus(p.streak) + lordIncomeBonus(p);
-    onRoundStart(p);
+    onRoundStart(s, p);
     if (p.shop.locked) p.shop.locked = false;
     else rollShop(s, p);
   }

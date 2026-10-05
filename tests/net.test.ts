@@ -342,3 +342,22 @@ describe('ready', async () => {
     expect(withReady(battle, 0, true)).toBe(battle);
   });
 });
+
+describe('lord status (V key)', async () => {
+  const { lordStatus } = await import('../src/ui/components/hud/lordStatus.ts');
+  const base = G.newGame(9).players[0]!;
+  const def = (id: string, extra: object = {}) => ({ id, name: id, title: 't', glyph: 'g', color: '#fff', description: '', kind: 'active', ...extra }) as never;
+  const p = (lordState: Record<string, number>, extra: object = {}) => ({ ...base, coins: 5, lordState, ...extra });
+  test('ember forge progress in two stages', () => {
+    expect(lordStatus(p({ forges: 4 }), def('ember_spirit', { cost: 1 }), 3).line).toBe('Forge 4/9 → Flame Sword');
+    expect(lordStatus(p({ forges: 11 }), def('ember_spirit', { cost: 1 }), 3).line).toBe('Forge 2/9 → Divine Sword');
+    expect(lordStatus(p({ forges: 18 }), def('ember_spirit', { cost: 1 }), 3).badge).toBe('done');
+  });
+  test('zeus bolt damage, cost gating, rubick countdown, bound target', () => {
+    expect(lordStatus(p({ bolts: 2 }), def('zeus_lord', { cost: 1 }), 1).short).toBe('Bolt 180 ×2');
+    expect(lordStatus(p({}, { coins: 0 }), def('zeus_lord', { cost: 1 }), 1).poor).toBe(true);
+    expect(lordStatus(p({}), def('rubick', { kind: 'passive' }), 4).line).toBe("Free Aghanim's in 2 rounds");
+    expect(lordStatus(p({}), def('rubick', { kind: 'passive' }), 6).line).toBe("Free Aghanim's this round");
+    expect(lordStatus(p({}, { lordTarget: 'h1' }), def('naga_siren', { cost: 0, needsTarget: true }), 1).boundUid).toBe('h1');
+  });
+});

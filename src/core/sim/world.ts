@@ -1,9 +1,9 @@
 // Battle world state + damage/heal/status primitives. No effect interpretation here.
-import type { BattleEvent, DamageType, ItemId, ProjectileSnapshot, SpellId, StatusKind, Team, Vec } from '../types.ts';
+import type { BattleEvent, DamageType, TeamMods, ItemId, ProjectileSnapshot, SpellId, StatusKind, Team, Vec } from '../types.ts';
 import type { Rng } from '../rng.ts';
 import { ARENA_H, ARENA_W, FLOOR } from '../constants.ts';
 import { armorMult } from '../stats.ts';
-import type { Unit } from './unit.ts';
+import { isHidden, type Unit } from './unit.ts';
 import type { PassiveEntry } from '../stats.ts';
 
 export const BODY = 18;
@@ -72,6 +72,8 @@ export class World {
   taskSeq = 0;
   gains: Record<string, { str: number; agi: number; int: number; kills: number }> = {};
   damageDealt: Record<string, number> = {};
+  teamMods: Record<Team, TeamMods> = { left: {}, right: {} };
+  cullUsed: Record<Team, boolean> = { left: false, right: false };
 
   constructor(
     public rng: Rng,
@@ -151,7 +153,7 @@ export class World {
 
   dealDamage(src: Unit | null, dst: Unit, amount: number, type: DamageType, o: DmgOpts = {}): number {
     if (!dst.alive || !(amount > 0)) return 0;
-    if (dst.invulnUntil > this.t) return 0;
+    if (dst.invulnUntil > this.t || dst.hypnoUntil > this.t) return 0;
     if (type === 'magical' && dst.immuneUntil > this.t && (!src || src.team !== dst.team)) return 0;
     let a = amount;
     if (o.spell && src) a *= 1 + Math.max(-90, src.cur.spellAmp) / 100;
@@ -180,8 +182,33 @@ export class World {
       const ls = o.attack ? src.cur.lifesteal : o.spell ? src.cur.spellLifesteal : 0;
       if (ls > 0) this.heal(src, (dealt * ls) / 100);
     }
+    if (dst.hp > 0) this.checkCull(src, dst);
     if (dst.hp <= 0) this.kill(dst, src);
     return dealt;
+  }
+
+  /** Axe lord: the first enemy unit to drop below the threshold dies instantly (once per battle per team). */
+  checkCull(src: Unit | null, dst: Unit): void {
+    const side: Team = dst.team === 'left' ? 'right' : 'left';
+    const pct = this.teamMods[side].cullThresholdPct ?? 0;
+    if (pct <= 0 || this.cullUsed[side]) return;
+    if (dst.hp >= (dst.cur.maxHp * pct) / 100) return;
+    this.cullUsed[side] = true;
+    this.proc(src ?? dst, dst, { spellId: 'culling_blade', itemId: null });
+    dst.hp = 0;
+    this.kill(dst, src);
+  }
+
+  /** Phantom Assassin lord: blink/leap grants damage (+ spell immunity) for a while. */
+  onLeap(u: Unit): void {
+    const bb = this.teamMods[u.team].blinkBuff;
+    if (!bb || !u.alive || !(bb.duration > 0)) return;
+    if (bb.damagePct) u.buffs.push({ stat: 'damagePct', value: bb.damagePct, until: this.t + bb.duration, show: true });
+    this.status(u, 'buffed', bb.duration);
+    if (bb.spellImmune) {
+      u.immuneUntil = Math.max(u.immuneUntil, this.t + bb.duration);
+      this.status(u, 'spell_immune', bb.duration);
+    }
   }
 
   kill(dst: Unit, killer: Unit | null): void {
@@ -196,6 +223,10 @@ export class World {
     if (killer && killer !== dst && killer.team !== dst.team) {
       const g = this.gains[killer.uid];
       if (g) g.kills += 1;
+      if (killer.alive && killer.invisOnKill > 0) {
+        killer.invisUntil = Math.max(killer.invisUntil, this.t + killer.invisOnKill);
+        this.status(killer, 'invisible', killer.invisOnKill);
+      }
       for (const pe of killer.killStacks) {
         if (pe.p.t !== 'on_kill_stack') continue;
         const amt = pe.p.amount;
@@ -216,6 +247,6 @@ export class World {
 
   /** Units that can be chosen as an attack target. */
   attackable(u: Unit): Unit[] {
-    return this.units.filter((o) => o.alive && o.team !== u.team && o.invulnUntil <= this.t);
+    return this.units.filter((o) => o.alive && o.team !== u.team && !isHidden(o, this.t));
   }
 }

@@ -306,5 +306,121 @@ describe('runBattle', () => {
       helix.passives = saved;
     }
   });
+
+});
+
+describe('lord battle mechanics', () => {
+  const T = (heroes: OwnedHero[], mods: BattleTeamInput['mods'] = {}, heroMods: BattleTeamInput['heroMods'] = {}): BattleTeamInput => ({
+    playerId: 0,
+    heroes,
+    mods,
+    heroMods,
+  });
+  const ev = (r: ReturnType<typeof runBattle>) => r.events;
+
+  test('OwnedHero.bonus and HeroMods stats', () => {
+    const h = mk('axe', 10);
+    const base = computeStats(h);
+    expect(computeStats({ ...h, bonus: { damage: 11, armor: 2 } }).damage).toBeCloseTo(base.damage + 11, 5);
+    const hm = computeStats(h, {}, { attackRange: 100, moveSpeed: 20, damagePct: 50 });
+    expect(hm.attackRange).toBeCloseTo(base.attackRange + 100, 5);
+    expect(hm.moveSpeed).toBeCloseTo(base.moveSpeed + 20, 5);
+    expect(hm.damage).toBeCloseTo(base.damage * 1.5, 5);
+    const agi = computeStats(h, {}, { agiDamageMult: 0.5 });
+    expect(agi.damage).toBeCloseTo(base.damage + Math.floor(0.5 * base.agi), 5);
+  });
+
+  test('granted spells (HeroMods + item grantsSpells) are cast', () => {
+    const r = runBattle(T([mk('axe', 10, { uid: 'a' })], {}, { a: { grantSpells: ['laser'] } }), T([mk('lina', 10)]), 1, { record: true });
+    expect(ev(r).some((e) => e.kind === 'cast' && e.src === 'a' && e.spellId === 'laser')).toBe(true);
+    const granted = ITEMS.flame_sword?.grantsSpells ?? [];
+    if (granted.length) expect(loadout(mk('axe', 10, { items: ['flame_sword'] })).spells.map((s) => s.id)).toContain(granted[0]!);
+  });
+
+  test('hypnotize: asleep, untargetable, regenerates, then wakes buffed + immune', () => {
+    const naga = mk('crystal_maiden', 10, { uid: 'naga', col: 3 });
+    const tank = mk('pudge', 20, { uid: 'tank', items: ['heart_of_tarrasque'] });
+    const r = runBattle(
+      T([naga, tank], {}, { naga: { hypnotize: { seconds: 3, hpPctPerSec: 5, damagePct: 50, immuneAfter: 2 } } }),
+      T([mk('sniper', 15), mk('zeus', 15, { col: 2 })]),
+      4,
+      { record: true },
+    );
+    const early = r.frames.filter((f) => f.t > 0 && f.t < 2.95);
+    for (const f of early) {
+      const u = f.units.find((x) => x.uid === 'naga')!;
+      expect(u.statuses).toContain('hypnotized');
+      expect(u.anim).toBe('idle');
+    }
+    expect(ev(r).some((e) => e.kind === 'damage' && e.dst === 'naga' && e.t < 2.95)).toBe(false);
+    expect(ev(r).some((e) => (e.kind === 'attack' || e.kind === 'cast') && e.src === 'naga' && e.t < 2.95)).toBe(false);
+    const after = r.frames.find((f) => f.t >= 3.5)!;
+    const nagaAfter = after.units.find((x) => x.uid === 'naga')!;
+    expect(nagaAfter.statuses).not.toContain('hypnotized');
+    if (nagaAfter.alive) expect(nagaAfter.statuses).toContain('spell_immune');
+  });
+
+  test('invisible on kill; breaks on attack', () => {
+    const riki = mk('juggernaut', 25, { uid: 'riki', items: ['divine_rapier', 'daedalus'] });
+    const r = runBattle(T([riki], {}, { riki: { invisibleOnKill: 2 } }), T([mk('lina', 1), mk('zeus', 1, { col: 3, row: 0 }), mk('sniper', 1, { col: 3, row: 2 })]), 2, {
+      record: true,
+    });
+    const firstDeath = ev(r).find((e) => e.kind === 'death')!;
+    expect(ev(r).some((e) => e.kind === 'status' && e.dst === 'riki' && e.status === 'invisible')).toBe(true);
+    const f = r.frames.find((fr) => fr.t > firstDeath.t + 1e-9)!;
+    expect(f.units.find((u) => u.uid === 'riki')!.statuses).toContain('invisible');
+  });
+
+  test('headshot procs and knocks back', () => {
+    const r = runBattle(T([mk('sniper', 10, { uid: 'sn' })], {}, { sn: { headshot: { chance: 100, damage: 50, knockback: 40 } } }), T([mk('axe', 10, { uid: 'ax' })]), 1, {
+      record: true,
+    });
+    const procs = ev(r).filter((e) => e.kind === 'proc' && e.src === 'sn' && e.dst === 'ax');
+    expect(procs.length).toBeGreaterThan(2);
+  });
+
+  test('refundChance refunds mana + cooldown', () => {
+    const run = (refundChance: number) =>
+      runBattle(T([mk('tinker', 10, { uid: 'tk' })], { refundChance }), T([mk('pudge', 30, { items: ['heart_of_tarrasque'] })]), 1, { record: true, maxDuration: 10 });
+    const a = run(0);
+    const b = run(100);
+    const casts = (r: ReturnType<typeof runBattle>) => ev(r).filter((e) => e.kind === 'cast' && e.src === 'tk' && e.spellId === 'laser').length;
+    expect(casts(b)).toBeGreaterThan(casts(a));
+    expect(ev(b).some((e) => e.kind === 'proc' && e.src === 'tk' && e.spellId === 'laser')).toBe(true);
+  });
+
+  test('cullThresholdPct kills the first enemy below the threshold, once', () => {
+    const r = runBattle(T([mk('axe', 15), mk('lina', 15, { col: 2 })], { cullThresholdPct: 40 }), T([mk('pudge', 10), mk('zeus', 10, { col: 2 })]), 3, { record: true });
+    const culls = ev(r).filter((e) => e.kind === 'proc' && e.spellId === 'culling_blade');
+    expect(culls.length).toBe(1);
+    const c = culls[0]!;
+    expect(ev(r).some((e) => e.kind === 'death' && e.dst === (c.kind === 'proc' ? c.dst : '') && e.t === c.t)).toBe(true);
+  });
+
+  test('openingStrike bolts random enemies at ~0.6s', () => {
+    const r = runBattle(T([mk('axe', 10, { uid: 'z' })], { openingStrike: { targets: 2, damage: 120 } }), T([mk('lina', 5), mk('zeus', 5, { col: 2 }), mk('sniper', 5, { col: 3 })]), 7, {
+      record: true,
+    });
+    const bolts = ev(r).filter((e) => e.kind === 'cast' && e.spellId === 'lightning_bolt');
+    expect(bolts.length).toBe(2);
+    expect(bolts[0]!.t).toBeCloseTo(0.6, 1);
+    expect(ev(r).filter((e) => e.kind === 'damage' && e.dmgType === 'magical' && Math.abs(e.t - bolts[0]!.t) < 1e-6).length).toBe(2);
+  });
+
+  test('blinkBuff: leaping grants damage + spell immunity', () => {
+    const r = runBattle(T([mk('phantom_assassin', 10, { uid: 'pa' })], { blinkBuff: { damagePct: 50, spellImmune: true, duration: 3 } }), T([mk('lina', 10), mk('zeus', 10, { col: 3 })]), 1, {
+      record: true,
+    });
+    const f = r.frames.find((fr) => fr.t >= 0.5)!;
+    expect(f.units.find((u) => u.uid === 'pa')!.statuses).toContain('spell_immune');
+  });
+
+  test('summons fight but are excluded from gains', () => {
+    const summon = { ...mk('juggernaut', 10, { uid: 'sum' }), summon: true };
+    const r = runBattle(T([mk('axe', 10, { uid: 'a' }), summon]), T([mk('lina', 3)]), 1, { record: true });
+    expect(r.gains['sum']).toBeUndefined();
+    expect(r.gains['a']).toBeDefined();
+    expect(ev(r).some((e) => e.kind === 'attack' && e.src === 'sum')).toBe(true);
+  });
 });
 

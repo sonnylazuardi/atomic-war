@@ -3,7 +3,7 @@ import { teamDirY } from '../constants.ts';
 import type { Area, Effect, ItemId, SpellId, Vec } from '../types.ts';
 import { SIM_DT } from '../constants.ts';
 import { asPct } from '../stats.ts';
-import type { Tgt, Unit } from './unit.ts';
+import { isHidden, type Tgt, type Unit } from './unit.ts';
 import { BODY, dist, type World, type Zone } from './world.ts';
 import { tgtOf } from './targeting.ts';
 
@@ -60,7 +60,7 @@ function canAffect(w: World, ctx: Ctx, u: Unit, e: Effect, pol: Polarity): boole
   if (pol === 'harm' && !enemy) return false;
   if (pol === 'help' && enemy) return false;
   if (enemy) {
-    if (u.invulnUntil > w.t) return false;
+    if (u.invulnUntil > w.t || u.hypnoUntil > w.t) return false;
     if (u.immuneUntil > w.t && !piercesImmunity(e)) return false;
   }
   return true;
@@ -220,6 +220,7 @@ function applyEffect(w: World, ctx: Ctx, e: Effect, tgt: Tgt): void {
         c.target = p;
         c.retargetAt = w.t + 1;
       }
+      w.onLeap(c);
       return;
     }
     case 'pull':
@@ -355,7 +356,7 @@ function doBounce(w: World, ctx: Ctx, e: Extract<Effect, { t: 'bounce' }>, tgt: 
     for (const o of w.units) {
       if (!o.alive || o.team !== team || o === cur) continue;
       if (!e.allowRepeat && hit.has(o.i)) continue;
-      if (o.team !== ctx.caster.team && (o.invulnUntil > w.t || o.immuneUntil > w.t)) continue;
+      if (o.team !== ctx.caster.team && (isHidden(o, w.t) || o.immuneUntil > w.t)) continue;
       const dd = dist(cur, o);
       if (dd <= (e.range || 300) + BODY && dd < bd) {
         bd = dd;
@@ -551,7 +552,7 @@ export function stepZones(w: World, dt: number): void {
         if (!u.alive || u === c) continue;
         if (z.affects === 'enemies' && u.team === z.team) continue;
         if (z.affects === 'allies' && u.team !== z.team) continue;
-        if (u.team !== z.team && (u.immuneUntil > w.t || u.invulnUntil > w.t)) continue;
+        if (u.team !== z.team && (u.immuneUntil > w.t || u.invulnUntil > w.t || u.hypnoUntil > w.t)) continue;
         const d = dist(z, u);
         if (d > z.radius + BODY || d < 6) continue;
         const mv = Math.min(z.pull * dt, d - 5);

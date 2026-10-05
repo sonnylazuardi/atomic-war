@@ -3,6 +3,7 @@ import type { VfxBundle } from '../types.ts';
 import { GlaivesOfWisdom, LagunaBlade, Laser, ThundergodsWrath, BlackHoleCast, BlackHoleZone } from './sig/magic.tsx';
 import { CounterHelix, CoupDeGrace, Enrage, EssenceShift, FleshHeap, Omnislash } from './sig/melee.tsx';
 import { ElderDragonForm, FocusFire, MacropyreCast, MacropyreZone } from './sig/dragons.tsx';
+import { ChargeOfDarkness, SleightOfFist } from './sig/lords.tsx';
 import { AssassinateBullet, AssassinateReticle, FreezingFieldCast, FreezingFieldZone, Marksmanship, ShallowGrave, SplitShot } from './sig/ranged.tsx';
 
 export const signatureVfx: VfxBundle = {
@@ -26,6 +27,8 @@ export const signatureVfx: VfxBundle = {
     elder_dragon_form: ElderDragonForm,
     focus_fire: FocusFire,
     macropyre: MacropyreCast,
+    charge_of_darkness: ChargeOfDarkness,
+    sleight_of_fist: SleightOfFist,
   },
   zones: { black_hole: BlackHoleZone, freezing_field: FreezingFieldZone, macropyre: MacropyreZone },
   projectiles: { assassinate: AssassinateBullet },

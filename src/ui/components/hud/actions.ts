@@ -98,6 +98,7 @@ export function triggerLord() {
   if (l.kind !== 'active') return;
   const ui = useUi.getState();
   if (ui.lordTargeting) return ui.setLordTargeting(false);
+  if ((l.cost ?? 0) > p.coins) return;
   if (!safe(() => lordActiveAvailable(p), true)) return;
   if (l.needsTarget) ui.setLordTargeting(true);
   else g.useLordAbility();

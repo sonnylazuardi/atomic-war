@@ -95,6 +95,47 @@ function AghsBadge({ t }: { t: number }) {
   );
 }
 
+/** Naga's Song: soft pink/teal bubble, swirling music notes, "Zz" */
+function SirenSong({ t }: { t: number }) {
+  return (
+    <g pointerEvents="none">
+      <ellipse cx={0} cy={-40} rx={34} ry={48} fill="#f08ad8" opacity={0.1 + Math.sin(t * 2) * 0.03} />
+      <ellipse cx={0} cy={-40} rx={34} ry={48} fill="none" stroke="#7fe3d8" strokeWidth={1.6} strokeDasharray="10 6" strokeDashoffset={-t * 20} opacity={0.6} />
+      {[0, 1, 2, 3].map((i) => {
+        const a = t * 1.8 + (i * Math.PI) / 2;
+        const x = Math.cos(a) * 30;
+        const y = -44 + Math.sin(a) * 34;
+        return (
+          <text key={i} x={x} y={y} textAnchor="middle" fontSize={i % 2 ? 13 : 11} fill={i % 2 ? '#ff9fe6' : '#7fe8dc'} stroke="#2a1030" strokeWidth={2} paintOrder="stroke" opacity={0.65 + 0.35 * Math.sin(a * 2)}>
+            {i % 2 ? '♫' : '♪'}
+          </text>
+        );
+      })}
+      {[0, 1].map((i) => {
+        const k = (t * 0.6 + i * 0.5) % 1;
+        return (
+          <text key={`z${i}`} x={12 + k * 14} y={-92 - k * 22} fontSize={10 + k * 6} fontWeight={800} fill="#e8f6ff" stroke="#1a2440" strokeWidth={2.5} paintOrder="stroke" opacity={1 - k} fontFamily="system-ui, sans-serif">
+            Z
+          </text>
+        );
+      })}
+    </g>
+  );
+}
+
+/** Riki's smoke: shimmering outline + drifting puffs */
+function SmokeOutline({ t }: { t: number }) {
+  return (
+    <g pointerEvents="none">
+      <ellipse cx={0} cy={-40} rx={26} ry={44} fill="none" stroke="#b9a6ff" strokeWidth={1.6} strokeDasharray="4 5" strokeDashoffset={t * 25} opacity={0.55 + Math.sin(t * 6) * 0.2} />
+      {[0, 1, 2, 3].map((i) => {
+        const k = (t * 0.5 + i * 0.25) % 1;
+        return <circle key={i} cx={Math.sin(i * 2.1 + t) * 18} cy={-10 - k * 70} r={5 + k * 7} fill="#8f84b8" opacity={(1 - k) * 0.25} />;
+      })}
+    </g>
+  );
+}
+
 /** small icons in a row above the bars */
 function StatusIcon({ s, x }: { s: StatusKind; x: number }) {
   const bg = (fill: string, child: ReactNode) => (
@@ -140,9 +181,16 @@ export function UnitView({ u, fx, human, battleT }: { u: UnitSnapshot; fx: BarFx
   const icons = u.alive ? ICON_STATUSES.filter((s) => st.has(s)) : [];
   // dead units fade once their fall anim is mostly done
   const deadFade = u.alive ? 1 : Math.max(0.35, 1 - u.animT * 0.8);
+  const asleep = u.alive && st.has('hypnotized');
+  const invis = u.alive && st.has('invisible');
+  const summon = u.uid.startsWith('summon-');
+  // invisible: faint for its own (human) side, nearly gone for the enemy
+  const unitOpacity = invis && !human ? 0.12 : deadFade;
+  const sway = asleep ? Math.sin(battleT * 1.6) * 6 : 0;
+  const artOpacity = invis ? 0.28 : asleep ? 0.7 : undefined;
 
   return (
-    <g transform={`translate(${u.x.toFixed(1)},${u.y.toFixed(1)})`} opacity={deadFade}>
+    <g transform={`translate(${u.x.toFixed(1)},${u.y.toFixed(1)})`} opacity={unitOpacity < 1 ? unitOpacity : undefined}>
       <ellipse cx={0} cy={0} rx={22} ry={7} fill="#000" opacity={0.35} />
       {human && u.alive && (
         <ellipse cx={0} cy={0} rx={27} ry={9} fill="none" stroke={team} strokeOpacity={0.45} strokeWidth={1.5} strokeDasharray="5 4" strokeDashoffset={battleT * 12} />
@@ -151,9 +199,14 @@ export function UnitView({ u, fx, human, battleT }: { u: UnitSnapshot; fx: BarFx
         <ellipse cx={0} cy={0} rx={30} ry={10} fill="none" stroke="#9fd0ff" strokeOpacity={0.6} strokeWidth={2} strokeDasharray="12 8" strokeDashoffset={-battleT * 40} />
       )}
       {st.has('rooted') && u.alive && <Vines t={battleT} />}
-      <g transform={u.facing === -1 ? 'scale(-1,1)' : undefined} filter={u.alive ? undefined : 'url(#aw-desat)'}>
-        {hexed ? <Sheep t={battleT} /> : <Art anim={u.anim} t={u.animT} dur={u.animDur} team={u.team} />}
+      <g transform={sway ? `rotate(${sway.toFixed(2)})` : undefined} opacity={artOpacity}>
+        <g transform={u.facing === -1 ? 'scale(-1,1)' : undefined} filter={u.alive ? undefined : 'url(#aw-desat)'}>
+          {hexed ? <Sheep t={battleT} /> : <Art anim={asleep ? 'idle' : u.anim} t={asleep ? battleT * 0.4 : u.animT} dur={asleep ? 0 : u.animDur} team={u.team} />}
+        </g>
       </g>
+      {invis && <SmokeOutline t={battleT} />}
+      {asleep && <SirenSong t={battleT} />}
+      {summon && u.alive && <ellipse cx={0} cy={-40} rx={27} ry={45} fill="none" stroke="#8fd0ff" strokeWidth={1.4} opacity={0.35 + Math.sin(battleT * 4) * 0.12} />}
       {st.has('burning') && u.alive && <Flames t={battleT} />}
       {st.has('grave') && u.alive && <ellipse cx={0} cy={-40} rx={30} ry={46} fill="#8a4fd0" opacity={0.12 + Math.sin(battleT * 6) * 0.05} />}
       {st.has('invulnerable') && u.alive && <ellipse cx={0} cy={-40} rx={28} ry={44} fill="#fff" opacity={0.1 + Math.sin(battleT * 10) * 0.05} />}
@@ -170,7 +223,7 @@ export function UnitView({ u, fx, human, battleT }: { u: UnitSnapshot; fx: BarFx
       {st.has('stunned') && u.alive && <StunStars t={battleT} />}
       {u.alive && (
         <g>
-          <rect x={-BAR_W / 2 - 1} y={BAR_Y - 1} width={BAR_W + 2} height={11} rx={2} fill="#0a0b0f" opacity={0.85} />
+          <rect x={-BAR_W / 2 - 1} y={BAR_Y - 1} width={BAR_W + 2} height={11} rx={2} fill="#0a0b0f" opacity={0.85} stroke={summon ? '#8fd0ff' : undefined} strokeOpacity={summon ? 0.8 : undefined} />
           <rect x={-BAR_W / 2} y={BAR_Y} width={BAR_W * chipK} height={6} fill="#f2e6b8" />
           <rect x={-BAR_W / 2} y={BAR_Y} width={BAR_W * hpK} height={6} fill={team} />
           <rect x={-BAR_W / 2} y={BAR_Y} width={BAR_W * hpK} height={2} fill="#fff" opacity={0.25} />
@@ -190,6 +243,11 @@ export function UnitView({ u, fx, human, battleT }: { u: UnitSnapshot; fx: BarFx
             </text>
           </g>
           {st.has('aghanim') && <AghsBadge t={battleT} />}
+          {summon && (
+            <text x={0} y={BAR_Y - 4} textAnchor="middle" fontSize={8} fontWeight={800} letterSpacing="0.08em" fill="#a8dcff" stroke="#0a1626" strokeWidth={2.5} paintOrder="stroke" fontFamily="system-ui, sans-serif">
+              SUMMON
+            </text>
+          )}
           {icons.map((s, i) => (
             <StatusIcon key={s} s={s} x={-BAR_W / 2 + 6 + i * 14} />
           ))}

@@ -1,6 +1,6 @@
 // Target selection: spell TargetRules and class-based attack targeting.
 import type { AiCondition, TargetRule } from '../types.ts';
-import type { Tgt, Unit } from './unit.ts';
+import { isHidden, type Tgt, type Unit } from './unit.ts';
 import { BODY, dist, type World } from './world.ts';
 
 export const RELAX_AOE_AFTER = 6;
@@ -39,7 +39,7 @@ export function spellEnemies(w: World, caster: Unit, range: number): Unit[] {
   const out: Unit[] = [];
   for (const o of w.units) {
     if (!o.alive || o.team === caster.team) continue;
-    if (o.invulnUntil > w.t || o.immuneUntil > w.t) continue;
+    if (isHidden(o, w.t) || o.immuneUntil > w.t) continue;
     if (range > 0 && dist(caster, o) > range + BODY * 2) continue;
     out.push(o);
   }
@@ -153,7 +153,7 @@ export function pickAttackTarget(w: World, u: Unit): Unit | null {
   const cands = w.attackable(u);
   if (cands.length === 0) return null;
   const cur = u.target;
-  const valid = cur && cur.alive && cur.invulnUntil <= w.t && cur.team !== u.team;
+  const valid = cur && cur.alive && !isHidden(cur, w.t) && cur.team !== u.team;
   if (valid && u.lockTarget) return cur;
   if (valid && w.t < u.retargetAt) return cur;
   u.retargetAt = w.t + 0.5;

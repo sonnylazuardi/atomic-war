@@ -121,6 +121,7 @@ export function LordSelect() {
                 aria-selected={sel === i}
                 data-testid="lord-option"
                 data-lord={id}
+                title={`${l.name} — ${l.title}: ${l.description}`}
                 className={`sm-card${sel === i ? ' sel' : ''}`}
                 style={{ ['--lord-c' as string]: l.color, animationDelay: `${i * 90}ms` }}
                 onClick={() => setSel(i)}

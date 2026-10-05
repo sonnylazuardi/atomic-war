@@ -94,8 +94,10 @@ export function makeFakeBattle(): BattleResult {
   const pudge = mk('L1', 'pudge', 'left', 0, 1, { hp: 950, maxHp: 950, dmg: 72, speed: 100, level: 5 });
   const lina = mk('L2', 'lina', 'left', 2, 0, { hp: 560, maxHp: 560, dmg: 64, range: 380, ranged: true, level: 9, maxMana: 420, mana: 260 });
   lina.status.aghanim = Infinity; // holds Aghanim's Scepter (badge + blue cast flash)
+  pudge.status.hypnotized = 1.2; // Naga's Song at battle start (visual QA)
   const axe = mk('R1', 'axe', 'right', 0, 1, { hp: 880, maxHp: 880, dmg: 62, speed: 115, level: 5 });
   const drow = mk('R2', 'drow_ranger', 'right', 2, 2, { hp: 520, maxHp: 520, dmg: 52, range: 420, ranged: true, level: 13 });
+  drow.status.invisible = 2.5; // Riki smoke (visual QA)
   const units = [pudge, lina, axe, drow];
 
   const frames: BattleFrame[] = [];
@@ -397,6 +399,10 @@ export function makeFakeBattle(): BattleResult {
   }
 
   const duration = frames[frames.length - 1]!.t;
+  // lord procs for visual QA: Invoker refund on Lina, Axe execute callout
+  events.push({ t: 1.6, kind: 'proc', src: lina.uid, dst: lina.uid, spellId: 'light_strike_array', itemId: null, at: { x: lina.x, y: lina.y } });
+  events.push({ t: 2.4, kind: 'proc', src: axe.uid, dst: pudge.uid, spellId: 'culling_blade', itemId: null, at: { x: pudge.x, y: pudge.y } });
+  events.sort((a, b) => a.t - b.t);
   events.push({ t: duration, kind: 'end', winner });
   return {
     winner,

@@ -17,7 +17,7 @@ import {
 import { HEROES } from '../data/heroes.ts';
 import { ITEMS } from '../data/items.ts';
 import { SPELLS } from '../data/spells.ts';
-import { HERO_IDS, HERO_KITS, ITEM_IDS, SPELL_IDS } from '../ids.ts';
+import { HERO_IDS, HERO_KITS, ITEM_IDS, LORD_SPELL_IDS, SPELL_IDS } from '../ids.ts';
 import type { Rng } from '../rng.ts';
 import type { GameState, HeroId, ItemId, OwnedHero, PlayerState, SpellId, Stars } from '../types.ts';
 import { addLevels, refreshCostFor, spellCostFor } from './lords.ts';
@@ -95,6 +95,10 @@ function rollByStars<T extends string>(
   return out;
 }
 
+/** lord-only spells (Charge of Darkness, Sleight of Fist) never roll in the shop */
+const SHOP_SPELLS: SpellId[] = (SPELL_IDS as readonly SpellId[]).filter(
+  (id) => !SPELLS[id]?.lordOnly && !(LORD_SPELL_IDS as readonly string[]).includes(id),
+);
 const SHOP_ITEMS: ItemId[] = ITEM_IDS.filter((id) => ITEMS[id] && !ITEMS[id].lordOnly);
 
 export function rollItems(rng: Rng, shopLevel: number, n: number, exclude: readonly (ItemId | null)[] = []): ItemId[] {
@@ -103,7 +107,7 @@ export function rollItems(rng: Rng, shopLevel: number, n: number, exclude: reado
 }
 
 export function rollSpells(rng: Rng, shopLevel: number, n: number, exclude: readonly (SpellId | null)[] = []): SpellId[] {
-  return rollByStars(rng, clampLevel(shopLevel + 1), n, SPELL_IDS as readonly SpellId[], (id) => SPELLS[id]?.stars ?? 1, 5, exclude);
+  return rollByStars(rng, clampLevel(shopLevel + 1), n, SHOP_SPELLS, (id) => SPELLS[id]?.stars ?? 1, 5, exclude);
 }
 
 export function rollHeroes(rng: Rng, shopLevel: number, n: number, exclude: readonly (HeroId | null)[] = []): HeroId[] {
@@ -218,7 +222,7 @@ export function refreshShopM(s: GS, pid: number) {
   const cost = refreshCostFor(p);
   if (p.coins < cost) return fail(s, p, 'Not enough coins.');
   p.coins -= cost;
-  if (p.lordId === 'tinker_lord') p.lordState.freeRefreshUsed = 1;
+  if (p.lordId === 'tinker_lord') p.lordState.freeRefreshUsed = (p.lordState.freeRefreshUsed ?? 0) + 1;
   rollShop(s, p);
 }
 

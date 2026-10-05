@@ -1,5 +1,7 @@
 // Basic attacks and attack-related passives.
 import type { PassiveDef } from '../types.ts';
+import { teamDirY } from '../constants.ts';
+import { SPELLS } from '../data/index.ts';
 import { asPct, type PassiveEntry } from '../stats.ts';
 import type { Unit } from './unit.ts';
 import { BODY, dist, type World } from './world.ts';
@@ -12,6 +14,7 @@ const ctxOf = (u: Unit, pe: PassiveEntry): Ctx => ({ caster: u, spellId: pe.spel
 /** Attack release point reached: melee hits now, ranged spawns a projectile. */
 export function releaseAttack(w: World, u: Unit, target: Unit): void {
   w.emit({ t: w.t, kind: 'attack', src: u.uid, dst: target.uid });
+  u.invisUntil = 0; // attacking breaks invisibility
   const extras: Unit[] = [];
   let splitPct = 0;
   let splitPe: PassiveEntry | null = null;
@@ -62,7 +65,7 @@ export function releaseAttack(w: World, u: Unit, target: Unit): void {
 }
 
 export function resolveAttack(w: World, src: Unit, dst: Unit, frac: number, main: boolean): void {
-  if (!dst.alive || dst.invulnUntil > w.t) return;
+  if (!dst.alive || dst.invulnUntil > w.t || dst.hypnoUntil > w.t) return;
   // miss: evasion and blind (true strike ignores both)
   if (!src.trueStrike) {
     const hit = (1 - dst.cur.evasion / 100) * (1 - src.cur.blind / 100);
@@ -103,6 +106,21 @@ export function resolveAttack(w: World, src: Unit, dst: Unit, frac: number, main
   else w.addMana(src, 3);
   if (!main) return;
 
+  // Sniper lord headshot: bonus physical damage + knockback away from the attacker
+  const hs = src.headshot;
+  if (hs && dst.alive && w.rng.chance(chanceOf(hs.chance))) {
+    w.proc(src, dst, { spellId: SPELLS.headshot ? 'headshot' : null, itemId: null });
+    if (hs.damage > 0) w.dealDamage(src, dst, hs.damage, 'physical', {});
+    if (dst.alive && hs.knockback > 0) {
+      const dd = dist(src, dst);
+      const dx = dd < 1 ? 0 : (dst.x - src.x) / dd;
+      const dy = dd < 1 ? -teamDirY(dst.team) : (dst.y - src.y) / dd;
+      dst.x += dx * hs.knockback;
+      dst.y += dy * hs.knockback;
+      w.clampPos(dst);
+    }
+  }
+
   for (const pe of src.onAttack) {
     const p = pe.p as Extract<PassiveDef, { t: 'on_attack' }>;
     if (!dst.alive) break;
@@ -123,7 +141,7 @@ export function resolveAttack(w: World, src: Unit, dst: Unit, frac: number, main
       const pct = asPct(p.params?.pct ?? 40);
       const radius = p.params?.radius ?? 150;
       for (const o of w.units) {
-        if (!o.alive || o === dst || o.team === src.team || o.invulnUntil > w.t) continue;
+        if (!o.alive || o === dst || o.team === src.team || o.invulnUntil > w.t || o.hypnoUntil > w.t) continue;
         if (dist(dst, o) <= radius + BODY) w.dealDamage(src, o, (dmg * pct) / 100, 'physical', {});
       }
     }

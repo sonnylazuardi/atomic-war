@@ -85,7 +85,10 @@ function itemAttr(id: ItemId): Attr | null {
   return vals[0]![1] > 0 ? vals[0]![0] : null;
 }
 
-const tierOf = (id: ItemId | null) => (id ? (ITEMS[id]?.tier ?? 1) + (id === 'divine_sword_of_the_sun' ? 5 : 0) : 0);
+/** forge swords are valued by their stage, not their (lord-only) tier */
+const FORGE_TIER: Partial<Record<ItemId, number>> = { broken_sword: 1, flame_sword: 9, divine_sword_of_the_sun: 11 };
+const FORGE_ITEMS = new Set<ItemId>(['broken_sword', 'flame_sword', 'divine_sword_of_the_sun']);
+const tierOf = (id: ItemId | null) => (id ? (FORGE_TIER[id] ?? ITEMS[id]?.tier ?? 1) : 0);
 
 function heroValue(h: OwnedHero): number {
   return h.level * 2 + h.items.reduce((s, it) => s + tierOf(it), 0) * 2 + (h.stacks.str + h.stacks.agi + h.stacks.int) / 4;
@@ -158,7 +161,7 @@ function equipItems(s: GS, p: PlayerState) {
   // sell leftovers that nobody can use (never the broken sword)
   for (let inv = p.itemInventory.length - 1; inv >= 0; inv--) {
     const it = p.itemInventory[inv]!;
-    if (it !== 'broken_sword' && it !== 'divine_sword_of_the_sun') sellItemM(s, p.id, inv);
+    if (!FORGE_ITEMS.has(it)) sellItemM(s, p.id, inv);
   }
 }
 
@@ -269,12 +272,21 @@ function useLord(s: GS, p: PlayerState, phase: 'start' | 'end') {
   if (p.lordId === 'bounty_hunter' && phase === 'start') {
     const bank = p.lordState.bank ?? 0;
     if (bank >= 6 || s.round >= 8) useLordAbilityM(s, p.id);
-  } else if (p.lordId === 'omniknight' && phase === 'end' && s.round >= 3) {
+  } else if (p.lordId === 'omniknight' && phase === 'start' && s.round >= 3) {
     const target = bestHeroes(p, s.round)[0];
     if (target && target.level <= 18) useLordAbilityM(s, p.id, target.uid);
-  } else if (p.lordId === 'ursa_lord' && phase === 'end') {
-    let guard = 20;
+  } else if ((p.lordId === 'naga_siren' || p.lordId === 'spirit_breaker') && phase === 'end') {
+    // bind the song / charge to the strongest hero (free, re-picked every round)
+    const target = bestHeroes(p, s.round)[0];
+    if (target && p.lordTarget !== target.uid) useLordAbilityM(s, p.id, target.uid);
+  } else if ((p.lordId === 'ember_spirit' || p.lordId === 'zeus_lord') && phase === 'end') {
+    // spend every spare coin after shopping
+    let guard = 40;
     while (lordActiveAvailable(p) && guard-- > 0) useLordAbilityM(s, p.id);
+  } else if (p.lordId === 'luna' && phase === 'end') {
+    const target = bestHeroes(p, s.round)[0];
+    let guard = 40;
+    while (target && lordActiveAvailable(p) && guard-- > 0) useLordAbilityM(s, p.id, target.uid);
   }
 }
 

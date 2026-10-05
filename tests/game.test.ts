@@ -19,7 +19,7 @@ import {
   offersForShopLevel,
   shopUpgradeCost,
 } from '../src/core/constants.ts';
-import { HERO_IDS, HERO_KITS } from '../src/core/ids.ts';
+import { HERO_IDS, HERO_KITS, LORD_IDS, LORD_SPELL_IDS } from '../src/core/ids.ts';
 import { createRng } from '../src/core/rng.ts';
 import { ITEMS } from '../src/core/data/items.ts';
 import { LORDS } from '../src/core/data/lords.ts';
@@ -70,7 +70,10 @@ describe('newGame', () => {
     expect(human.shop.spellOffers.length).toBe(offersForShopLevel(1));
     expect(human.shop.itemOffers.length).toBe(offersForShopLevel(1));
     for (const it of human.shop.itemOffers) expect(ITEMS[it!].lordOnly).toBeFalsy();
-    expect(Object.keys(LORDS).length).toBe(8);
+    expect(Object.keys(LORDS).sort()).toEqual([...LORD_IDS].sort());
+    for (const l of Object.values(LORDS)) expect(l.description.length).toBeGreaterThan(20);
+    // lord-only spells never roll in the shop
+    for (const sp of human.shop.spellOffers) expect((LORD_SPELL_IDS as readonly string[]).includes(sp!)).toBe(false);
   });
 
   test('deterministic by seed', () => {
@@ -145,10 +148,10 @@ describe('shop & economy', () => {
     expect(p.shop.itemOffers.length).toBe(offersForShopLevel(2));
   });
 
-  test('rubick spells cost 2, tinker first refresh free + shop lvl 2', () => {
+  test('spells cost SPELL_COST for every lord, tinker first two refreshes free + shop lvl 2', () => {
     let s = withCoins(prepGame(3, 'rubick'), 10);
     s = G.buySpell(s, 0, 0);
-    expect(s.players[0]!.coins).toBe(8);
+    expect(s.players[0]!.coins).toBe(10 - SPELL_COST);
 
     let t = prepGame(3, 'tinker_lord');
     expect(t.players[0]!.shopLevel).toBe(2);
@@ -157,12 +160,14 @@ describe('shop & economy', () => {
     t = G.refreshShop(t, 0);
     expect(t.players[0]!.coins).toBe(c);
     t = G.refreshShop(t, 0);
+    expect(t.players[0]!.coins).toBe(c);
+    t = G.refreshShop(t, 0);
     expect(t.players[0]!.coins).toBe(c - REFRESH_COST);
   });
 
-  test('alchemist gets +2 coins', () => {
+  test('alchemist gets +1 coin', () => {
     const s = prepGame(4, 'alchemist');
-    expect(s.players[0]!.coins).toBe(incomeForRound(1) + 2);
+    expect(s.players[0]!.coins).toBe(incomeForRound(1) + 1);
   });
 
   test('buying a hero you own upgrades it immediately (+4 lv, no click needed)', () => {
@@ -379,38 +384,72 @@ describe('roster', () => {
 });
 
 describe('lords', () => {
-  test('ursa forge 8 -> divine sword', () => {
-    let s = withCoins(prepGame(1, 'ursa_lord'), 10);
+  /** advance n rounds (human idle) */
+  function advance(s: GameState, n: number): GameState {
+    for (let i = 0; i < n && s.phase === 'prep'; i++) {
+      s = G.finishBattle(G.readyForBattle(s));
+      if (s.phase !== 'results') break;
+      s = G.nextRound(s);
+    }
+    return s;
+  }
+  /** human with one hero of `heroId` */
+  function withOne(lord: Parameters<typeof prepGame>[1], heroId: HeroId = 'juggernaut', coins = 30) {
+    let s = withCoins(offer(prepGame(1, lord), heroId), coins);
+    s = G.buyHero(s, 0, 0);
+    return { s, uid: s.players[0]!.heroes[0]!.uid };
+  }
+
+  test('ember spirit forge: 9 -> flame sword, 18 -> divine sword', () => {
+    let s = withCoins(prepGame(1, 'ember_spirit'), 30);
     expect(s.players[0]!.itemInventory).toContain('broken_sword');
     expect(G.lordActiveAvailable(s.players[0]!)).toBe(true);
     for (let i = 0; i < 8; i++) s = G.useLordAbility(s, 0);
-    const p = s.players[0]!;
-    expect(p.coins).toBe(2);
-    expect(p.lordState.forges).toBe(8);
-    expect(p.itemInventory).toContain('divine_sword_of_the_sun');
+    expect(s.players[0]!.itemInventory).toContain('broken_sword');
+    s = G.useLordAbility(s, 0);
+    let p = s.players[0]!;
+    expect(p.lordState.forges).toBe(G.FORGES_FOR_FLAME);
+    expect(p.itemInventory).toContain('flame_sword');
     expect(p.itemInventory).not.toContain('broken_sword');
+    for (let i = 0; i < 9; i++) s = G.useLordAbility(s, 0);
+    p = s.players[0]!;
+    expect(p.lordState.forges).toBe(G.FORGES_FOR_DIVINE);
+    expect(p.itemInventory).toContain('divine_sword_of_the_sun');
+    expect(p.itemInventory).not.toContain('flame_sword');
+    expect(p.coins).toBe(30 - 18);
     expect(G.lordActiveAvailable(p)).toBe(false);
+    expect(G.useLordAbility(s, 0).players[0]!.coins).toBe(p.coins);
   });
 
-  test('ursa forge works while equipped', () => {
-    let s = withCoins(offer(prepGame(1, 'ursa_lord'), 'juggernaut'), 20);
-    s = G.buyHero(s, 0, 0);
-    const uid = s.players[0]!.heroes[0]!.uid;
+  test('ember forge works while equipped', () => {
+    let { s, uid } = withOne('ember_spirit');
     s = G.equipItem(s, 0, uid, 1, s.players[0]!.itemInventory.indexOf('broken_sword'));
-    for (let i = 0; i < 8; i++) s = G.useLordAbility(s, 0);
+    for (let i = 0; i < 9; i++) s = G.useLordAbility(s, 0);
+    expect(s.players[0]!.heroes[0]!.items[1]).toBe('flame_sword');
+    for (let i = 0; i < 9; i++) s = G.useLordAbility(s, 0);
     expect(s.players[0]!.heroes[0]!.items[1]).toBe('divine_sword_of_the_sun');
   });
 
-  test('omniknight +12 once, bounty bank, axe mods', () => {
-    let s = withCoins(offer(prepGame(1, 'omniknight'), 'zeus'), 10);
-    s = G.buyHero(s, 0, 0);
-    const uid = s.players[0]!.heroes[0]!.uid;
+  test('omniknight +12 once for 1 coin, sell value unchanged', () => {
+    let { s, uid } = withOne('omniknight', 'zeus', 10);
+    const before = s.players[0]!.coins;
     s = G.useLordAbility(s, 0, uid);
     expect(s.players[0]!.heroes[0]!.level).toBe(START_HERO_LEVEL + 12);
     expect(s.players[0]!.heroes[0]!.spells.length).toBe(SPELL_SLOTS);
+    expect(s.players[0]!.coins).toBe(before - 1);
+    expect(s.players[0]!.lordState.used).toBe(1);
     s = G.useLordAbility(s, 0, uid);
     expect(s.players[0]!.heroes[0]!.level).toBe(START_HERO_LEVEL + 12);
+    expect(s.players[0]!.coins).toBe(before - 1);
+    const sold = G.sellHero(s, 0, uid);
+    expect(sold.players[0]!.coins).toBe(before - 1 + SELL_HERO);
+    // no coin -> no purification
+    const broke = withOne('omniknight', 'zeus', 3);
+    const b = G.useLordAbility(withCoins(broke.s, 0), 0, broke.uid);
+    expect(b.players[0]!.heroes[0]!.level).toBe(START_HERO_LEVEL);
+  });
 
+  test('bounty hunter banks unspent coins', () => {
     let b = prepGame(1, 'bounty_hunter');
     const coins = b.players[0]!.coins;
     b = G.readyForBattle(b);
@@ -419,11 +458,117 @@ describe('lords', () => {
     if (b.phase === 'results') {
       b = G.nextRound(b);
       b = G.useLordAbility(b, 0);
-      expect(b.players[0]!.coins).toBe(incomeForRound(2) + coins);
       expect(b.players[0]!.lordState.bank).toBe(0);
+      expect(b.players[0]!.coins).toBeGreaterThanOrEqual(incomeForRound(2) + coins);
     }
+  });
 
-    expect(G.teamModsFor({ ...s.players[0]!, lordId: 'axe_lord' }).hpPct).toBe(15);
+  test('team mods: axe cull, invoker refund, zeus bolt, phantom strike', () => {
+    const p = prepGame(1, 'axe_lord').players[0]!;
+    expect(G.teamModsFor({ ...p, lordId: 'axe_lord' })).toEqual({ cullThresholdPct: 45 });
+    expect(G.teamModsFor({ ...p, lordId: 'invoker' })).toEqual({ refundChance: 25 });
+    expect(G.teamModsFor({ ...p, lordId: 'phantom_assassin_lord' })).toEqual({
+      blinkBuff: { damagePct: 50, spellImmune: true, duration: 4 },
+    });
+    expect(G.teamModsFor({ ...p, lordId: 'alchemist' })).toEqual({});
+
+    let z = withCoins(prepGame(1, 'zeus_lord'), 5);
+    expect(G.teamModsFor(z.players[0]!).openingStrike).toEqual({ targets: 2, damage: 90 });
+    z = G.useLordAbility(G.useLordAbility(z, 0), 0);
+    expect(z.players[0]!.lordState.bolts).toBe(2);
+    expect(z.players[0]!.coins).toBe(3);
+    expect(G.teamModsFor(z.players[0]!).openingStrike).toEqual({ targets: 2, damage: 180 });
+  });
+
+  test('naga song and spirit breaker charge bind to one hero (re-pickable)', () => {
+    let s = withCoins(offer(offer(prepGame(1, 'naga_siren'), 'axe', 0), 'lina', 1), 30);
+    s = G.buyHero(G.buyHero(s, 0, 0), 0, 1);
+    const [a, b] = s.players[0]!.heroes.map((h) => h.uid) as [string, string];
+    expect(G.heroModsFor(s.players[0]!, s.round)).toEqual({});
+    s = G.useLordAbility(s, 0, a);
+    expect(s.players[0]!.lordTarget).toBe(a);
+    expect(s.players[0]!.coins).toBe(30 - 2 * HERO_COST);
+    expect(G.heroModsFor(s.players[0]!, s.round)).toEqual({
+      [a]: { hypnotize: { seconds: 4, hpPctPerSec: 6, damagePct: 80, immuneAfter: 6 } },
+    });
+    s = G.useLordAbility(s, 0, b);
+    expect(Object.keys(G.heroModsFor(s.players[0]!, s.round))).toEqual([b]);
+
+    const sb = withOne('spirit_breaker', 'axe');
+    const t = G.useLordAbility(sb.s, 0, sb.uid);
+    expect(G.heroModsFor(t.players[0]!, t.round)).toEqual({ [sb.uid]: { grantSpells: ['charge_of_darkness'] } });
+  });
+
+  test('riki buffs melee heroes, sniper buffs hunters', () => {
+    let s = withCoins(offer(offer(prepGame(1, 'riki'), 'axe', 0), 'sniper', 1), 30);
+    s = G.buyHero(G.buyHero(s, 0, 0), 0, 1);
+    const p = s.players[0]!;
+    const axe = p.heroes.find((h) => h.heroId === 'axe')!;
+    const sniper = p.heroes.find((h) => h.heroId === 'sniper')!;
+    const riki = G.heroModsFor(p, 1);
+    expect(riki[axe.uid]).toEqual({ agiDamageMult: 1, moveSpeed: 20, invisibleOnKill: 3 });
+    expect(riki[sniper.uid]).toBeUndefined();
+    const sn = G.heroModsFor({ ...p, lordId: 'sniper_lord' }, 1);
+    expect(sn[sniper.uid]).toEqual({ attackRange: 150, damagePct: 15, headshot: { chance: 40, damage: 60, knockback: 30 } });
+    expect(sn[axe.uid]).toBeUndefined();
+  });
+
+  test('luna blessing stacks +11 damage per coin', () => {
+    let { s, uid } = withOne('luna', 'axe', 10);
+    for (let i = 0; i < 3; i++) s = G.useLordAbility(s, 0, uid);
+    const p = s.players[0]!;
+    expect(p.heroes[0]!.bonus?.damage).toBe(33);
+    expect(p.lordState.blessings).toBe(3);
+    expect(p.coins).toBe(10 - HERO_COST - 3);
+    // no target -> no-op
+    expect(G.useLordAbility(s, 0).players[0]!.coins).toBe(p.coins);
+  });
+
+  test('rubick: free Aghanim on rounds 6, 12, ...', () => {
+    const at = (round: number) => {
+      const c = structuredClone(prepGame(2, 'rubick'));
+      c.phase = 'results';
+      c.round = round - 1;
+      return G.nextRound(c).players[0]!.itemInventory.filter((i) => i === 'aghanims_scepter').length;
+    };
+    expect(at(2)).toBe(0);
+    expect(at(5)).toBe(0);
+    expect(at(6)).toBe(1);
+    expect(at(7)).toBe(0);
+    expect(at(12)).toBe(1);
+    expect(at(18)).toBe(1);
+    // real flow
+    const s = advance(prepGame(2, 'rubick'), 5);
+    if (s.phase === 'prep' && s.round === 6) expect(s.players[0]!.itemInventory).toContain('aghanims_scepter');
+  });
+
+  test('juggernaut summon joins battle inputs only', () => {
+    let { s } = withOne('juggernaut_lord', 'axe');
+    const p = s.players[0]!;
+    expect(G.lordSummon(p, 2)).toBeNull(); // joins from round 3
+    const sum = G.lordSummon(p, 3)!;
+    expect(sum.summon).toBe(true);
+    expect(sum.uid).toBe('summon-0-3');
+    expect(sum.heroId).toBe('juggernaut');
+    expect(sum.level).toBe(3);
+    expect(sum.spells).toEqual([...HERO_KITS.juggernaut.slice(0, 2), null, null, null]);
+    expect(sum.items.filter(Boolean)).toEqual([]);
+    expect(sum.items.length).toBe(ITEM_SLOTS);
+    expect(p.heroes.some((h) => h.slot?.col === sum.slot!.col && h.slot.row === sum.slot!.row)).toBe(false);
+    const late = G.lordSummon(p, 20)!;
+    expect(late.level).toBe(12);
+    expect(late.items.filter(Boolean)).toEqual(['broadsword']);
+    expect(G.lordSummon(p, 60)!.level).toBe(12);
+    expect(G.lordSummon({ ...p, lordId: 'axe_lord' }, 1)).toBeNull();
+
+    s = G.readyForBattle(s);
+    const pr = s.pairings.find((x) => x.left === 0 || x.right === 0)!;
+    const io = G.pairingInputs(s, pr);
+    const mine = pr.left === 0 ? io.left : io.right;
+    expect(mine.heroes.some((h) => h.summon)).toBe(false); // round 1: no summon yet (joins from round 3; see mp.test)
+    expect(s.players[0]!.heroes.length).toBe(1);
+    s = G.finishBattle(s);
+    expect(s.players[0]!.heroes.every((h) => !h.summon)).toBe(true);
   });
 });
 

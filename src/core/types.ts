@@ -225,6 +225,8 @@ export interface SpellDef {
     patch: Partial<Pick<SpellDef, 'effects' | 'passives' | 'cooldown' | 'manaCost' | 'castRange' | 'castPoint' | 'aoeRadius' | 'target' | 'ai'>>;
   };
   vfx: { kind: VfxKind; duration: number; color: string };
+  /** granted only by lords/items, never rolled in the Mystery shop */
+  lordOnly?: boolean;
 }
 
 // ---------------------------------------------------------------- items
@@ -241,6 +243,8 @@ export interface ItemDef {
   /** fires automatically in battle */
   active?: { when: 'battle_start' | 'low_hp' | 'cooldown'; cooldown?: number; target: TargetRule; effects: Effect[] };
   lordOnly?: boolean; // never appears in shop
+  /** spells the holder gains while this item is equipped (Ember's swords grant Sleight of Fist) */
+  grantsSpells?: SpellId[];
 }
 
 // ---------------------------------------------------------------- lords
@@ -256,6 +260,8 @@ export interface LordDef {
   kind: 'passive' | 'active';
   activeLabel?: string; // button text, e.g. "Forge (1)"
   needsTarget?: boolean; // active ability targets one of your heroes
+  cost?: number; // coins per use (0 = free)
+  usesPerGame?: number; // e.g. Omniknight 1
 }
 
 /** Battle-wide modifiers a lord (or anything else) applies to one team. */
@@ -265,6 +271,31 @@ export interface TeamMods {
   armor?: number;
   attackSpeed?: number;
   spellAmp?: number;
+  /** Invoker: % chance that a spell cast refunds its mana and cooldown (instant recast) */
+  refundChance?: number;
+  /** Axe: the FIRST enemy hero to drop below this % HP dies instantly (once per battle) */
+  cullThresholdPct?: number;
+  /** Zeus: at battle start a lightning bolt strikes `targets` random enemies for `damage` magical */
+  openingStrike?: { targets: number; damage: number };
+  /** Phantom Assassin: after an ally blinks/leaps (leap effect, blink dagger) it gets these for `duration` s */
+  blinkBuff?: { damagePct: number; spellImmune: boolean; duration: number };
+}
+
+/** Per-hero battle modifiers from lords (keyed by OwnedHero.uid in BattleTeamInput.heroMods). */
+export interface HeroMods {
+  /** Naga: hypnotized for `seconds` at battle start — untargetable, can't act, regenerates `hpPctPerSec`% max
+   *  HP per second — then wakes with +`damagePct`% damage and spell immunity for `immuneAfter` seconds */
+  hypnotize?: { seconds: number; hpPctPerSec: number; damagePct: number; immuneAfter: number };
+  /** Spirit Breaker: extra spells added to the hero for this battle (after its own spells) */
+  grantSpells?: SpellId[];
+  /** Riki (melee heroes): bonus attack damage = mult x AGI, + move speed, invisible for N s after a kill */
+  agiDamageMult?: number;
+  moveSpeed?: number;
+  invisibleOnKill?: number;
+  /** Sniper (archer heroes): + range, + damage %, headshot proc */
+  attackRange?: number;
+  damagePct?: number;
+  headshot?: { chance: number; damage: number; knockback: number };
 }
 
 // ---------------------------------------------------------------- owned state (persists across rounds)
@@ -284,6 +315,10 @@ export interface OwnedHero {
   stacks: { str: number; agi: number; int: number }; // permanent gains (flesh heap, essence shift, glaives)
   slot: BoardSlot | null; // null = on bench
   kills: number;
+  /** permanent flat bonuses (Luna's Lunar Blessing +11 damage per use, …); folded in by computeStats */
+  bonus?: Partial<StatBlock>;
+  /** a lord summon that fights this battle only (Juggernaut's Heroic Reinforcement) — never in PlayerState */
+  summon?: boolean;
 }
 
 export interface ShopState {
@@ -303,6 +338,8 @@ export interface PlayerState {
   placement: number | null; // 8 = first eliminated ... 1 = winner
   lordId: LordId | null;
   lordState: Record<string, number>; // per-lord counters (forges, banked coins, used flags)
+  /** the hero uid a targeted lord ability is bound to (Naga's Song, Spirit Breaker's Charge, Luna) */
+  lordTarget?: string | null;
   coins: number;
   shopLevel: number; // TAVERN level 1..MAX_SHOP_LEVEL (shown as ★ on the F key)
   shop: ShopState;
@@ -374,8 +411,9 @@ export interface GameState {
 
 export interface BattleTeamInput {
   playerId: number;
-  heroes: OwnedHero[]; // only heroes on board (slot !== null)
+  heroes: OwnedHero[]; // only heroes on board (slot !== null); may include lord summons (OwnedHero.summon)
   mods: TeamMods;
+  heroMods?: Record<string, HeroMods>; // by OwnedHero.uid
 }
 
 export type AnimState = 'idle' | 'walk' | 'attack' | 'cast' | 'hurt' | 'dead';
@@ -393,6 +431,8 @@ export type StatusKind =
   | 'buffed'
   | 'channeling'
   | 'burning'
+  | 'hypnotized' // Naga's Song of the Siren: asleep, untargetable, regenerating
+  | 'invisible' // Riki: untargetable until it attacks or the timer ends
   | 'aghanim'; // carries Aghanim's Scepter (spells upgraded) — drawn as a blue crown/glow
 
 export interface UnitSnapshot {

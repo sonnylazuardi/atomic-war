@@ -160,7 +160,7 @@ export const LORD_SELECT_CSS = `
   color: rgba(238,230,218,.82);
   text-shadow: 0 1px 2px rgba(0,0,0,.9);
   display: -webkit-box;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 6;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -234,14 +234,14 @@ export const LORD_SELECT_CSS = `
     padding: 2px 0;
   }
   .sm-card { padding: 0 8px 8px; animation-duration: .35s; }
-  .sm-fig { height: clamp(96px, calc(100cqh - 250px), 170px); margin: 0 -8px; }
+  .sm-fig { height: clamp(90px, calc(100cqh - 266px), 170px); margin: 0 -8px; }
   .sm-fig::before { width: 70%; height: 90%; bottom: 4px; }
   .sm-name { font-size: 16px; margin: 2px 0 6px; }
   .sm-ability { display: grid; grid-template-columns: 30px 1fr; column-gap: 7px; row-gap: 4px; align-items: center; }
   .sm-text { display: contents; }
   .sm-icon { width: 30px; height: 30px; padding: 2px; border-width: 1px; }
   .sm-ab-title { font-size: 12px; flex-wrap: wrap; row-gap: 0; line-height: 1.15; }
-  .sm-desc { grid-column: 1 / -1; margin: 0; font-size: 12px; line-height: 1.3; -webkit-line-clamp: 2; }
+  .sm-desc { grid-column: 1 / -1; margin: 0; font-size: 12px; line-height: 1.3; -webkit-line-clamp: 3; }
   .sm-actions {
     position: static;
     transform: none;
@@ -254,6 +254,7 @@ export const LORD_SELECT_CSS = `
   .sm-btn.reroll { width: 52px; font-size: 26px; }
   .sm-btn.start { width: auto; flex: 1; }
   .sm-hint { display: none; }
+  .sm-card.sel .sm-desc { -webkit-line-clamp: unset; display: block; }
 }
 /* phone portrait: 2x2 grid, bigger text */
 @container summoner (max-width: 760px) and (min-height: 560px) {
@@ -262,12 +263,12 @@ export const LORD_SELECT_CSS = `
   .sm-timer span { font-size: 18px; }
   .sm-title { font-size: 24px; line-height: 1.2; height: auto; margin: 4px 0 6px; }
   .sm-row { grid-template-columns: repeat(2, 1fr); gap: 10px 8px; align-content: center; }
-  .sm-fig { height: clamp(112px, calc(50cqh - 250px), 175px); }
+  .sm-fig { height: clamp(92px, calc(50cqh - 318px), 160px); }
   .sm-name { font-size: 18px; }
   .sm-ability { grid-template-columns: 34px 1fr; }
   .sm-icon { width: 34px; height: 34px; }
   .sm-ab-title { font-size: 13px; }
-  .sm-desc { -webkit-line-clamp: 3; }
+  .sm-desc { -webkit-line-clamp: 7; line-height: 1.28; }
   .sm-btn { height: 54px; font-size: 20px; }
   .sm-btn.reroll { width: 58px; }
   .sm-actions { width: 100%; padding-top: 8px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }

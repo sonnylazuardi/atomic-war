@@ -156,3 +156,37 @@ describe('online newGame', () => {
     expect(v.lordChoices).toEqual(s.lordChoices);
   });
 });
+
+describe('lord battle inputs', () => {
+  test('summons, team mods and hero mods replay identically from pairingInputs', () => {
+    const lords = ['juggernaut_lord', 'zeus_lord', 'naga_siren', 'spirit_breaker', 'riki', 'sniper_lord', 'luna', 'axe_lord'] as const;
+    let s = G.newGame(31, { allBots: true });
+    s = structuredClone(s);
+    s.players.forEach((p, i) => G.applyLordPick(s, p, lords[i]!));
+    // a few rounds so bots bind targets, buy bolts/blessings, summons scale
+    for (let r = 0; r < 4 && s.phase !== 'game_over'; r++) {
+      s = G.readyForBattle(s, { record: false });
+      for (const rep of s.reports) {
+        const { left, right } = G.pairingInputs(s, rep.pairing);
+        // view-side replay (what a client sees) must equal the server inputs
+        const v = G.viewFor(s, rep.pairing.left);
+        const vi = G.pairingInputs(v, rep.pairing);
+        expect(vi.left).toEqual(left);
+        expect(vi.right).toEqual(right);
+        if (left.heroes.length === 0 || right.heroes.length === 0) continue;
+        const res = runBattle(left, right, rep.seed!, { record: false });
+        expect(res.winner).toBe(rep.winner);
+        expect(res.duration).toBe(rep.duration);
+      }
+      const jug = s.players[0]!;
+      if (jug.alive && s.round >= 3) {
+        const io = G.pairingInputs(s, s.pairings.find((p) => p.left === 0 || p.right === 0)!);
+        const mine = io.left.playerId === 0 ? io.left : io.right;
+        expect(mine.heroes.some((h) => h.summon)).toBe(true);
+      }
+      s = G.finishBattle(s);
+      expect(s.players.every((p) => p.heroes.every((h) => !h.summon))).toBe(true);
+      if (s.phase === 'results') s = G.nextRound(s);
+    }
+  });
+});

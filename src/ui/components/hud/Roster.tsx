@@ -3,13 +3,14 @@ import { LEVELS_PER_UPGRADE, MAX_HEROES } from '../../../core/constants.ts';
 import { boardOrder } from '../../../core/game/index.ts';
 import { teamModsFor } from '../../../core/game/lords.ts';
 import type { ItemId, OwnedHero, SpellId, TeamMods } from '../../../core/types.ts';
-import { useMe } from '../../me.ts';
+import { meOf, useMe } from '../../me.ts';
 import { useGame } from '../../store.ts';
-import { CLASS_INFO, fmt, heroDef, itemDef, safeStats, spellDef, starColor } from '../defs.ts';
+import { CLASS_INFO, fmt, heroDef, itemDef, lordDef, safeStats, spellDef, starColor } from '../defs.ts';
 import { dragProps, useDrop } from '../dnd.ts';
 import { HeroPortrait, phaseOf } from '../HeroPortrait.tsx';
 import { AghGlyph, HeroTip, ItemTip, SpellTip, tip } from '../Tooltip.tsx';
 import { useUi, type RosterTab } from '../uiState.ts';
+import { LUNA_PER_USE } from './lordStatus.ts';
 import { assignSpellSafe, clickHero, confirmInnateLoss, dropOnHero, innate, safe } from './actions.ts';
 
 export function SpellSlot({ hero, idx, id, prep }: { hero: OwnedHero; idx: number; id: SpellId | null; prep: boolean }) {
@@ -127,6 +128,10 @@ function RosterRow({ hero, mods, prep, tab }: { hero: OwnedHero; mods?: TeamMods
     (p) => dropOnHero(p, hero.uid),
   );
   const targetable = prep && (ui.lordTargeting || !!ui.pending);
+  const owner = meOf(g);
+  const lord = owner.lordId && owner.lordTarget === hero.uid ? lordDef(owner.lordId) : null;
+  const bound = lord && lord.needsTarget ? lord : null;
+  const blessings = owner.lordState?.blessings ?? 0;
   return (
     <div
       data-testid="hero-card"
@@ -143,6 +148,22 @@ function RosterRow({ hero, mods, prep, tab }: { hero: OwnedHero; mods?: TeamMods
         <div className="rr-port" {...tip(() => <HeroTip id={hero.heroId} />)}>
           <HeroPortrait heroId={hero.heroId} phase={phaseOf(hero.uid)} />
           <span className="rr-lvl">{hero.level}</span>
+          {bound && (
+            <span
+              className="rr-bound"
+              data-testid="lord-bound"
+              style={{ ['--lord-c' as string]: bound.color }}
+              {...tip(() => (
+                <div className="tip-body">
+                  <b>{bound.title}</b> is bound to this hero
+                  {bound.id === 'luna' && blessings > 0 ? ` · +${LUNA_PER_USE * blessings} dmg (${blessings}×)` : ''}
+                </div>
+              ))}
+            >
+              {bound.glyph}
+              {bound.id === 'luna' && blessings > 0 && <b>{blessings}</b>}
+            </span>
+          )}
         </div>
         <div className="rr-slots">
           {tab === 'skills'

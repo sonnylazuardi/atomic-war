@@ -66,6 +66,12 @@ export function effectsForEvent(ev: BattleEvent, ctx: SpawnCtx): Effect[] {
       break;
     }
     case 'proc': {
+      const callout = ev.spellId === 'culling_blade' ? { text: 'CULLED!', color: '#ff3b3b', stroke: '#2a0000' } : ev.spellId && ev.dst === ev.src && spellDef(ev.spellId)?.kind !== 'passive' ? { text: 'REFRESH!', color: '#7fe3ff', stroke: '#001a2a' } : null;
+      if (callout) {
+        const p = ctx.pos(ev.dst ?? ev.src) ?? ev.at;
+        out.push({ kind: 'text', id: ctx.nextId(), start: t, dur: 1.4, x: p.x, y: p.y - 125, text: callout.text, color: callout.color, size: 22, stroke: callout.stroke, big: true });
+        if (ev.spellId === 'culling_blade') ctx.shake(6);
+      }
       if (ev.spellId) {
         const def = spellDef(ev.spellId);
         const team = ctx.team(ev.src) ?? 'left';
