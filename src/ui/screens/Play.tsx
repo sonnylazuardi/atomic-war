@@ -6,6 +6,7 @@ import { currentDrag, useDragState } from '../components/dnd.ts';
 import { SellZone, sellPayload } from '../components/hud/SellZone.tsx';
 import { clickHero, dropOnHero, triggerLord } from '../components/hud/actions.ts';
 import { Dock } from '../components/hud/Dock.tsx';
+import { toggleReady } from '../components/hud/ReadyButton.tsx';
 import { InventoryGrid } from '../components/hud/InventoryGrid.tsx';
 import { useLayoutMode } from '../components/hud/layout.ts';
 import { MobileBar } from '../components/hud/MobileBar.tsx';
@@ -205,6 +206,11 @@ export function Play() {
       }
       if (e.repeat && (isSpace || e.code === 'KeyF' || e.code === 'KeyV')) {
         e.preventDefault();
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault(); // also stops a focused button from "clicking"
+        if (!e.repeat) toggleReady();
         return;
       }
       if (isSpace) {

@@ -4,6 +4,7 @@ import { makeOnlineActions, trimArgs, ACT_NAMES } from '../src/net/actions.ts';
 import { wsUrlFor } from '../src/net/config.ts';
 import { errorMessage } from '../src/net/api.ts';
 import type { ClientMsg, GameView, ServerMsg } from '../src/net/protocol.ts';
+import { PROTOCOL_VERSION } from '../src/net/protocol.ts';
 import { pingLevel, predictOne, Predictor } from '../src/net/predict.ts';
 import * as G from '../src/core/game/index.ts';
 import type { GameState } from '../src/core/types.ts';
@@ -93,7 +94,7 @@ describe('GameSocket', () => {
     s.send({ t: 'chat', text: 'hi' }); // queued until open
     expect(ws.sent).toEqual([]);
     ws.open();
-    expect(ws.sent[0]).toEqual({ t: 'hello', v: 2 });
+    expect(ws.sent[0]).toEqual({ t: 'hello', v: PROTOCOL_VERSION });
     expect(ws.sent[1]).toEqual({ t: 'chat', text: 'hi' });
     expect(ws.sent[2]).toEqual({ t: 'ping', at: 1000 });
     now = 1100;
@@ -109,7 +110,7 @@ describe('GameSocket', () => {
     const ws2 = FakeWs.all[1]!;
     expect(ws2.url).toBe(ws.url);
     ws2.open();
-    expect(ws2.sent[0]).toEqual({ t: 'hello', v: 2 });
+    expect(ws2.sent[0]).toEqual({ t: 'hello', v: PROTOCOL_VERSION });
     expect(s.status).toBe('online');
     expect(statuses).toEqual(['connecting', 'online', 'reconnecting', 'online']);
 
@@ -322,5 +323,22 @@ describe('spectating view merge', async () => {
     expect(mergeView(base, view, (x) => x, null, 5).selfId).toBe(5);
     expect(mergeView(base, view, (x) => x, null, null).selfId).toBe(1);
     expect(mergeView(base, { ...view, phase: 'game_over' }, (x) => x, null, 5).selfId).toBe(1);
+  });
+});
+
+describe('ready', async () => {
+  const { withReady } = await import('../src/net/session.ts');
+  const { readyTally } = await import('../src/ui/components/hud/ReadyButton.tsx');
+  test('tally counts alive, non-autopilot humans', () => {
+    const s = G.newGame(4, { humans: [{ name: 'A' }, { name: 'B' }, { name: 'C' }] });
+    const players = s.players.map((p, i) => ({ ...p, ready: i === 0 || i === 3, autopilot: i === 2 }));
+    expect(readyTally({ players })).toEqual({ n: 1, m: 2 }); // seat 3 is a bot, seat 2 on autopilot
+  });
+  test('optimistic own ready only during prep', () => {
+    const s = { ...G.newGame(4), phase: 'prep' as const };
+    expect(withReady(s, 0, true).players[0]!.ready).toBe(true);
+    expect(s.players[0]!.ready).toBeFalsy(); // input untouched
+    const battle = { ...s, phase: 'battle' as const };
+    expect(withReady(battle, 0, true)).toBe(battle);
   });
 });

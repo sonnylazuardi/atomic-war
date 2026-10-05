@@ -52,6 +52,11 @@ export function PlayerList({ opponent }: { opponent: number | null }) {
             <div className="hp-main">
               <div className="hp-name">
                 {p.name}
+                {phase === 'prep' && p.ready && p.alive && (
+                  <span className="hp-ready" data-testid="ready-check" title="Ready">
+                    ✓
+                  </span>
+                )}
                 {p.streak !== 0 && p.alive && (
                   <span className={`streak ${p.streak > 0 ? 'win' : 'loss'}`}>
                     {p.streak > 0 ? '🔥' : '❄'}

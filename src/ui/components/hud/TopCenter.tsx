@@ -1,6 +1,7 @@
 import { boardCap } from '../../../core/constants.ts';
 import { boardCount } from '../../../core/game/index.ts';
 import { useMe } from '../../me.ts';
+import { ReadyButton } from './ReadyButton.tsx';
 import { useGame } from '../../store.ts';
 
 export function TopCenter({ timer, enemy }: { timer: number | null; enemy: string | null }) {
@@ -35,6 +36,7 @@ export function TopCenter({ timer, enemy }: { timer: number | null; enemy: strin
           <div className="ht-sub">{phase === 'battle' && enemy ? `vs ${enemy}` : '—'}</div>
         )}
       </div>
+      <ReadyButton />
       <div className={`ht-stat ${n >= cap ? 'full' : ''}`} title="Heroes on board / cap">
         <span className="ht-ico">👤</span>
         {n}/{cap}

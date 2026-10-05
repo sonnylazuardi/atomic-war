@@ -69,8 +69,15 @@ async function playRound(page: Page, round: number) {
   await page.keyboard.press('Escape');
   if (round === 2) await page.keyboard.press('KeyF'); // upgrade tavern
   await shot(page, `r${round}-prep`);
-  await page.getByTestId('battle-skip').waitFor({ timeout: (PREP + 15) * 1000 }); // timer starts the battle
-  step(`round ${round}: battle started by the timer`);
+  if (round === 1) {
+    // READY starts the battle at once (offline), long before the prep timer runs out
+    await page.getByTestId('ready').click();
+    await page.getByTestId('battle-skip').waitFor({ timeout: 3000 });
+    step(`round ${round}: battle started by READY`);
+  } else {
+    await page.getByTestId('battle-skip').waitFor({ timeout: (PREP + 15) * 1000 }); // timer starts the battle
+    step(`round ${round}: battle started by the timer`);
+  }
   await page.waitForTimeout(800);
   await shot(page, `r${round}-teleport`);
   await page.waitForTimeout(2200); // watch the fight a bit

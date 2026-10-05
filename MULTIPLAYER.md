@@ -68,6 +68,10 @@ Game client: this repo (static SPA on Cloudflare Pages). Game server: `/home/son
     time, battles replay locally.
 22. **Spectating?** Eliminated online players click anyone in the player list → `watch {pid}`; the server
     streams that seat's view (`state.watching`) and battles; `watch {pid: null}` returns. Read-only.
+23. **Ready button?** Prep shows READY. Offline it starts the battle at once. Online it sends `ready {ready}`;
+    the server stores `PlayerState.ready` (visible to all as ✓ in the player list), and starts the battle as
+    soon as every connected, alive, non-autopilot human is ready, or at the prep deadline. Flags reset each
+    prep. Protocol v3.
 20. **Deploy?** kickstart: `fly deploy` (release command runs the migration). Game: `bun run deploy`.
 
 ## Endpoints (kickstart)

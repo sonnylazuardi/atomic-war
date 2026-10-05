@@ -216,6 +216,26 @@ export function startMatch() {
   socket?.send({ t: 'start' });
 }
 
+// optimistic own ready flag, shown until a server state agrees (or prep ends / 4 s pass)
+let pendingReady: { value: boolean; at: number } | null = null;
+
+/** apply our optimistic ready flag on top of a state (pure; exported for tests) */
+export function withReady(s: GameState, pid: number, value: boolean): GameState {
+  const p = s.players[pid];
+  if (!p || s.phase !== 'prep' || p.ready === value) return s;
+  const players = s.players.slice();
+  players[pid] = { ...p, ready: value };
+  return { ...s, players };
+}
+
+/** online READY toggle (prep only) */
+export function setReady(ready: boolean) {
+  if (!socket || useNet.getState().watching !== null) return;
+  socket.send({ t: 'ready', ready });
+  pendingReady = { value: ready, at: Date.now() };
+  useGame.setState(withReady(plainState(useGame.getState()), ownSeat(), ready) as Partial<GameStore>);
+}
+
 /** spectate seat `pid` (eliminated players only); null = back to our own arena */
 export function watch(pid: number | null) {
   socket?.send({ t: 'watch', pid });
@@ -248,6 +268,7 @@ function enterGame() {
   offlineSnapshot = useGame.getState();
   replay = null;
   lastPhaseKey = '';
+  pendingReady = null;
   predictor.reset();
   const actions = makeOnlineActions(dispatch, {
     onBattleDone: () => useNet.setState({ waitingOthers: true }),
@@ -316,7 +337,13 @@ function applyView(view: GameView, ackSeq: number | undefined, watching: number 
   } else {
     // server state is the truth; still-unacknowledged predictions are re-applied on top
     const base = { ...plainState(prev), ...merged } as GameState;
-    useGame.setState(predictor.reconcile(base, ownSeat(), ackSeq) as Partial<GameStore>);
+    let next = predictor.reconcile(base, ownSeat(), ackSeq);
+    if (pendingReady) {
+      const srv = next.players[ownSeat()]?.ready ?? false;
+      if (next.phase !== 'prep' || srv === pendingReady.value || Date.now() - pendingReady.at > 4000) pendingReady = null;
+      else next = withReady(next, ownSeat(), pendingReady.value);
+    }
+    useGame.setState(next as Partial<GameStore>);
   }
   const key = `${view.phase}:${view.round}`;
   if (key !== lastPhaseKey) {

@@ -154,6 +154,15 @@ try {
 
   // the server's prep deadline starts the battle; each client replays its own fight, then results, then round 2
   if (process.env.SMOKE_SHORT !== '1') {
+    // both press READY: the server starts the battle right away instead of waiting out the 40 s prep timer
+    const t0 = Date.now();
+    await host.getByTestId('ready').click();
+    await host.locator('[data-testid="ready"][data-ready="1"]').waitFor({ timeout: 5000 });
+    await guest.getByTestId('ready-check').first().waitFor({ timeout: 5000 }); // Alice's ✓ in Bob's list
+    step(`Alice ready (${(await host.getByTestId('ready').textContent())?.trim()})`);
+    await guest.getByTestId('ready').click();
+    await host.locator('[data-testid="world"][data-mode="battle"]').waitFor({ timeout: 8000 });
+    step(`both ready -> battle started after ${((Date.now() - t0) / 1000).toFixed(1)} s`);
     await Promise.all(
       [host, guest].map(async (p, i) => {
         const who = i ? 'Bob' : 'Alice';

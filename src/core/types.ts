@@ -310,6 +310,8 @@ export interface PlayerState {
   spellInventory: SpellId[];
   itemInventory: ItemId[];
   streak: number; // + win streak / - loss streak
+  /** online prep phase: pressed Ready this round (server-managed, reset at each new prep). */
+  ready?: boolean;
   /** online only: this player's private messages (purchase errors, upgrades). viewFor shows them as `log`. */
   log?: string[];
   lastResult: 'win' | 'loss' | 'draw' | null;

@@ -4,7 +4,7 @@
 
 import type { BattleTeamInput, GameActions, GameState, LordId, Team } from '../core/types.ts';
 
-export const PROTOCOL_VERSION = 2; // v2: act.seq/ackSeq, watch (spectate), prep 40s
+export const PROTOCOL_VERSION = 3; // v3: ready (early battle start); v2: act.seq/ackSeq, watch
 export const MAX_SEATS = 8;
 export const WS_PATH = '/ws/atomic';
 export const API_PREFIX = '/api/atomic';
@@ -92,6 +92,9 @@ export type ClientMsg =
   | { t: 'leave' }
   | { t: 'chat'; text: string }
   | { t: 'act'; name: ActName; args: unknown[]; seq?: number } // seq echoed back so optimistic UI can reconcile
+  /** prep phase: mark yourself ready (or not). The battle starts when every connected, alive,
+   *  non-autopilot human is ready — or when the prep deadline passes. */
+  | { t: 'ready'; ready: boolean }
   /** spectate another player's arena (eliminated players only); null = back to your own seat */
   | { t: 'watch'; pid: number | null }
   | { t: 'ping'; at: number };

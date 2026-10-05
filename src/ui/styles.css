@@ -2802,3 +2802,47 @@ body {
   width: auto;
   height: 88px;
 }
+
+/* ------------------------------------------------------------ READY (prep) */
+.ht-ready {
+  height: 34px;
+  padding: 0 18px;
+  font-family: var(--font-head);
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #10240f;
+  border: 1px solid #8ff09a;
+  background: linear-gradient(180deg, #7ee488, #3d9e46);
+  box-shadow: 0 0 14px rgba(95, 208, 104, 0.35);
+}
+.ht-ready:hover:not(:disabled) {
+  background: linear-gradient(180deg, #95f09e, #47b351);
+  border-color: #b6ffbd;
+}
+.ht-ready.waiting {
+  color: var(--radiant);
+  background: linear-gradient(180deg, #1f3a22, #142616);
+  border-color: #3d9e46;
+  box-shadow: none;
+  font-size: 12px;
+}
+.ht-ready.waiting small {
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  margin-left: 4px;
+  color: var(--text-dim);
+}
+.mplay .ht-ready {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+.hp-ready {
+  margin-left: 5px;
+  color: var(--radiant);
+  font-weight: 900;
+}
