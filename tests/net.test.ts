@@ -361,3 +361,22 @@ describe('lord status (V key)', async () => {
     expect(lordStatus(p({}, { lordTarget: 'h1' }), def('naga_siren', { cost: 0, needsTarget: true }), 1).boundUid).toBe('h1');
   });
 });
+
+describe('lord status: bounty hunter + bloodseeker', async () => {
+  const { lordStatus } = await import('../src/ui/components/hud/lordStatus.ts');
+  const base = G.newGame(9).players[0]!;
+  const def = (id: string) => ({ id, name: id, title: 't', glyph: 'g', color: '#fff', description: '', kind: 'active' }) as never;
+  const p = (lordState: Record<string, number>, extra: object = {}) => ({ ...base, lordState, ...extra });
+  test('gold hunting: stored amount, then cashed out once', () => {
+    expect(lordStatus(p({ bank: 7 }), def('bounty_hunter'), 7).short).toBe('+7 💰 stored');
+    expect(lordStatus(p({ bank: 0 }), def('bounty_hunter'), 1).disabled).toBe(true);
+    const done = lordStatus(p({ bank: 0, used: 1 }), def('bounty_hunter'), 9);
+    expect([done.short, done.disabled]).toEqual(['Cashed out', true]);
+  });
+  test('bloodrage: HP cost, armed state', () => {
+    expect(lordStatus(p({}, { hp: 80 }), def('bloodseeker'), 2).short).toBe('Bloodrage −40 HP');
+    expect(lordStatus(p({}, { hp: 40 }), def('bloodseeker'), 2).poor).toBe(true);
+    const armed = lordStatus(p({ bloodrage: 1 }, { hp: 80 }), def('bloodseeker'), 2);
+    expect([armed.armed, armed.disabled, armed.badge]).toEqual([true, true, 'ARMED']);
+  });
+});

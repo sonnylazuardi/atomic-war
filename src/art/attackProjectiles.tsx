@@ -193,6 +193,36 @@ const DragonFireball: ProjectileArt = ({ t }) => {
   );
 };
 
+/** Clinkz: burning arrow with licking flame trail. */
+const ClinkzFireArrow: ProjectileArt = ({ t }) => {
+  const f = (k: number) => Math.sin(t * 34 + k) * 2.2;
+  return (
+    <g>
+      <ellipse cx={-14} rx={16} ry={5} fill="#ff5a12" opacity={0.3} />
+      {[0, 1, 2, 3].map((i) => (
+        <circle key={i} cx={-8 - i * 5} cy={f(i * 1.9)} r={3.6 - i * 0.7} fill={i % 2 ? "#ffb347" : "#ff6a1a"} opacity={0.8 - i * 0.15} />
+      ))}
+      <line x1={-16} y1={0} x2={6} y2={0} stroke="#3b2418" strokeWidth={1.8} />
+      <path d="M-16,0 l-4,-3 l2,3 l-2,3 Z" fill="#ff8a2a" />
+      <path d="M10,0 L3,-3.2 L4,0 L3,3.2 Z" fill="#ffd23d" stroke="#c8401c" strokeWidth={0.8} />
+      <circle cx={6} r={5 + Math.sin(t * 40)} fill="#ff9a2e" opacity={0.35} />
+    </g>
+  );
+};
+
+/** Muerta: ghostly green-teal bullet with long tracer. */
+const MuertaBullet: ProjectileArt = ({ t }) => (
+  <g>
+    <line x1={-40} y1={0} x2={-4} y2={0} stroke="#5fffd0" strokeWidth={3.4} opacity={0.25} strokeLinecap="round" />
+    <line x1={-30} y1={0} x2={-3} y2={0} stroke="#b8fff0" strokeWidth={1.3} opacity={0.85} />
+    {[0, 1].map((i) => (
+      <circle key={i} cx={-12 - i * 10} cy={Math.sin(t * 26 + i * 2.4) * 2.5} r={1.6 - i * 0.4} fill="#7affd8" opacity={0.7 - i * 0.25} />
+    ))}
+    <circle r={6 + Math.sin(t * 36) * 0.8} fill="#3ae0b8" opacity={0.3} />
+    <ellipse cx={0} cy={0} rx={4.6} ry={2.3} fill="#c8fff0" stroke="#1fa888" strokeWidth={0.8} />
+  </g>
+);
+
 const ATTACK_PROJECTILES: Record<HeroId, ProjectileArt> = {
   pudge: None,
   axe: None,
@@ -213,6 +243,10 @@ const ATTACK_PROJECTILES: Record<HeroId, ProjectileArt> = {
   dragon_knight: DragonFireball,
   windranger: WindrangerArrow,
   jakiro: JakiroOrb,
+  riki: None,
+  clinkz: ClinkzFireArrow,
+  spectre: None,
+  muerta: MuertaBullet,
 };
 
 /** true when the hero has a visible basic-attack projectile (ranged) */

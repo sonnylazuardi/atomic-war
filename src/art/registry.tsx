@@ -7,6 +7,7 @@ import { signatureVfx } from './vfx/signatures.ts';
 import { kitAVfx } from './vfx/kitA.ts';
 import { kitBVfx } from './vfx/kitB.ts';
 import { kitCVfx } from './vfx/kitC.ts';
+import { kitDVfx } from './vfx/kitD.ts';
 import type { HeroArt, ProjectileArt, VfxArt, ZoneArt } from './types.ts';
 import { TEAM_COLORS, bump, clamp01, loop } from './types.ts';
 
@@ -35,7 +36,7 @@ const FallbackZone: ZoneArt = ({ t, x, y, radius }) => (
 const FallbackProjectile: ProjectileArt = () => <circle r={6} fill="#ffd36b" />;
 
 const heroArt: Partial<Record<HeroId, HeroArt>> = { ...heroArtGroup1, ...heroArtGroup2 };
-const bundles = [signatureVfx, shopSpellVfx, kitAVfx, kitBVfx, kitCVfx];
+const bundles = [signatureVfx, shopSpellVfx, kitAVfx, kitBVfx, kitCVfx, kitDVfx];
 const vfx = Object.assign({}, ...bundles.map((b) => b.vfx)) as typeof signatureVfx.vfx;
 const zones = Object.assign({}, ...bundles.map((b) => b.zones)) as typeof signatureVfx.zones;
 const projectiles = Object.assign({}, ...bundles.map((b) => b.projectiles)) as typeof signatureVfx.projectiles;

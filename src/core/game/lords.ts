@@ -23,6 +23,12 @@ export const FORGE_COST = 1;
 export const OMNI_LEVELS = 12;
 export const OMNI_COST = 1;
 export const PUDGE_LORD_HP = 150;
+/** Bounty Hunter: +1 coin stored at the start of every prep from round 2 (= per completed round) */
+export const BOUNTY_PER_ROUND = 1;
+/** Bloodseeker's Bloodrage: pay 40 summoner HP; win the next battle -> +100 HP (capped at max HP) and +50 damage to the loser */
+export const BLOODRAGE_COST_HP = 40;
+export const BLOODRAGE_HEAL = 100;
+export const BLOODRAGE_EXTRA_DAMAGE = 50;
 export const RUBICK_EVERY = 6;
 export const ZEUS_BOLT_COST = 1;
 export const ZEUS_BOLT_BASE = 90;
@@ -178,7 +184,9 @@ export function lordActiveAvailable(p: PlayerState): boolean {
     case 'ember_spirit':
       return forgeableSword(p) !== null;
     case 'bounty_hunter':
-      return (p.lordState.bank ?? 0) > 0;
+      return !p.lordState.used && (p.lordState.bank ?? 0) > 0;
+    case 'bloodseeker':
+      return !p.lordState.bloodrage && p.hp > BLOODRAGE_COST_HP;
     case 'omniknight':
       return !p.lordState.used && p.heroes.some((h) => h.level < MAX_HERO_LEVEL);
     case 'naga_siren':
@@ -215,6 +223,10 @@ export function applyLordPick(s: GameState, p: PlayerState, lordId: LordId) {
       break;
     case 'bounty_hunter':
       p.lordState.bank = 0;
+      p.lordState.used = 0;
+      break;
+    case 'bloodseeker':
+      p.lordState.bloodrage = 0;
       break;
     case 'omniknight':
       p.lordState.used = 0;
@@ -239,17 +251,45 @@ export function applyLordPick(s: GameState, p: PlayerState, lordId: LordId) {
   }
 }
 
-/** Called when a player leaves the prep phase (Bounty Hunter banking). */
-export function onLeavePrep(p: PlayerState) {
-  if (p.lordId === 'bounty_hunter' && p.coins > 0) {
-    p.lordState.bank = (p.lordState.bank ?? 0) + p.coins;
-    p.coins = 0;
+/** Called when a player leaves the prep phase (no lord uses it at the moment). */
+export function onLeavePrep(_p: PlayerState) {}
+
+/**
+ * Bloodrage payout, called by finishBattle with this round's results/damage maps (mutates them / hp).
+ * Armed + won: +100 HP (capped at max HP) and +50 damage to the (non-ghost) loser. Lost/draw: nothing.
+ * The flag is cleared either way.
+ */
+export function resolveBloodrage(
+  s: GameState,
+  results: Record<number, 'win' | 'loss' | 'draw'>,
+  damage: Record<number, number>,
+): (() => void)[] {
+  const heals: (() => void)[] = [];
+  for (const p of s.players) {
+    if (p.lordId !== 'bloodseeker' || !p.lordState.bloodrage) continue;
+    p.lordState.bloodrage = 0;
+    if (results[p.id] !== 'win') {
+      if (p.isHuman) say(s, p, 'Bloodrage failed: the 40 HP is lost.');
+      continue;
+    }
+    const rep = s.reports.find((r) => r.pairing.left === p.id || (r.pairing.right === p.id && !r.pairing.ghost));
+    if (rep && !rep.pairing.ghost) {
+      const foe = rep.pairing.left === p.id ? rep.pairing.right : rep.pairing.left;
+      if (results[foe] === 'loss') damage[foe] = (damage[foe] ?? 0) + BLOODRAGE_EXTRA_DAMAGE;
+    }
+    heals.push(() => {
+      const before = p.hp;
+      p.hp += BLOODRAGE_HEAL; // uncapped: a won gamble nets +60 even at full HP (can exceed max HP)
+      if (p.isHuman) say(s, p, `Bloodrage pays off: +${p.hp - before} HP!`);
+    });
   }
+  return heals;
 }
 
 /** Called at the start of every prep phase from round 2 on (after coins are set). */
 export function onRoundStart(s: GameState, p: PlayerState) {
   if (p.lordId === 'tinker_lord') p.lordState.freeRefreshUsed = 0;
+  if (p.lordId === 'bounty_hunter' && !p.lordState.used) p.lordState.bank = (p.lordState.bank ?? 0) + BOUNTY_PER_ROUND;
   if (p.lordId === 'rubick' && s.round > 0 && s.round % RUBICK_EVERY === 0) {
     p.itemInventory.push('aghanims_scepter');
     p.lordState.scepters = (p.lordState.scepters ?? 0) + 1;
@@ -286,11 +326,21 @@ export function useLordAbilityM(s: GS, pid: number, targetUid?: string) {
       return;
     }
     case 'bounty_hunter': {
+      if (p.lordState.used) return fail(s, p, 'Gold Hunting was already cashed in.');
       const bank = p.lordState.bank ?? 0;
-      if (bank <= 0) return fail(s, p, 'Bank is empty.');
+      if (bank <= 0) return fail(s, p, 'Nothing stored yet.');
       p.coins += bank;
       p.lordState.bank = 0;
-      if (p.isHuman) say(s, p, `Withdrew ${bank} coins from the bank.`);
+      p.lordState.used = 1;
+      if (p.isHuman) say(s, p, `Gold Hunting: cashed in ${bank} coins!`);
+      return;
+    }
+    case 'bloodseeker': {
+      if (p.lordState.bloodrage) return fail(s, p, 'Bloodrage is already active this round.');
+      if (p.hp <= BLOODRAGE_COST_HP) return fail(s, p, `Bloodrage needs more than ${BLOODRAGE_COST_HP} HP.`);
+      p.hp -= BLOODRAGE_COST_HP;
+      p.lordState.bloodrage = 1;
+      if (p.isHuman) say(s, p, `Bloodrage! −${BLOODRAGE_COST_HP} HP. Win the next battle for +${BLOODRAGE_HEAL} HP.`);
       return;
     }
     case 'omniknight': {

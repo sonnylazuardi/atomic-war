@@ -27,10 +27,12 @@ export const LORDS: Record<LordId, LordDef> = {
     title: 'Gold Hunting',
     glyph: '💰',
     color: '#c9902c',
-    description: 'Unspent coins at the end of each prep phase are banked instead of lost. Withdraw all banked coins at any time.',
+    description:
+      'Stores 1 coin at the start of every round (from round 2). Once per match, cash in everything stored at once. The longer you wait, the bigger the payout: save it for a tavern upgrade or a big buying round. After cashing in, nothing more is stored.',
     kind: 'active',
-    activeLabel: 'Withdraw bank',
+    activeLabel: 'Cash in',
     cost: 0,
+    usesPerGame: 1,
   },
   omniknight: {
     id: 'omniknight',
@@ -169,6 +171,18 @@ export const LORDS: Record<LordId, LordDef> = {
     activeLabel: 'Bless +11 (1)',
     needsTarget: true,
     cost: 1,
+  },
+  bloodseeker: {
+    id: 'bloodseeker',
+    name: 'Bloodseeker',
+    title: 'Bloodrage',
+    glyph: '🩸',
+    color: '#a3141c',
+    description:
+      'Costs you 40 summoner HP. Win the next round: +100 HP back (net +60) and +50 damage to the loser. Lose: the 40 HP is gone and you take normal loss damage. A gamble for when your board will win.',
+    kind: 'active',
+    activeLabel: 'Bloodrage (−40 HP)',
+    cost: 0,
   },
   phantom_assassin_lord: {
     id: 'phantom_assassin_lord',

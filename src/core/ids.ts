@@ -21,6 +21,10 @@ export const HERO_IDS = [
   'dragon_knight',
   'windranger',
   'jakiro',
+  'riki',
+  'clinkz',
+  'spectre',
+  'muerta',
 ] as const;
 export type HeroId = (typeof HERO_IDS)[number];
 
@@ -45,6 +49,10 @@ export const SIGNATURE_SPELLS = {
   dragon_knight: 'elder_dragon_form',
   windranger: 'focus_fire',
   jakiro: 'macropyre',
+  riki: 'tricks_of_the_trade',
+  clinkz: 'burning_army',
+  spectre: 'haunt',
+  muerta: 'pierce_the_veil',
 } as const satisfies Record<HeroId, string>;
 
 export const SHOP_SPELL_IDS = [
@@ -83,25 +91,34 @@ export const KIT_SPELL_IDS_C = [
   'breathe_fire', 'dragon_tail', 'dragon_blood', 'shackleshot', 'powershot', 'windrun',
   'dual_breath', 'ice_path', 'liquid_fire',
 ] as const;
+/** kit spells for riki, clinkz, spectre, muerta (blink_strike is reused from the shop spells) */
+export const KIT_SPELL_IDS_D = [
+  'smoke_screen', 'cloak_and_dagger', 'tricks_of_the_trade',
+  'strafe', 'tar_bomb', 'death_pact', 'burning_army',
+  'spectral_dagger', 'desolate', 'dispersion', 'haunt',
+  'dead_shot', 'the_calling', 'gunslinger', 'pierce_the_veil',
+] as const;
+export type KitSpellIdD = (typeof KIT_SPELL_IDS_D)[number];
 export type KitSpellIdA = (typeof KIT_SPELL_IDS_A)[number];
 export type KitSpellIdB = (typeof KIT_SPELL_IDS_B)[number];
 export type KitSpellIdC = (typeof KIT_SPELL_IDS_C)[number];
 /** spells authored in src/core/data/spells.ts (hero signatures + the original shop spells) */
-export type BaseSpellId = (typeof SIGNATURE_SPELLS)[HeroId] | (typeof SHOP_SPELL_IDS)[number];
+export type BaseSpellId = Exclude<(typeof SIGNATURE_SPELLS)[HeroId], KitSpellIdD> | (typeof SHOP_SPELL_IDS)[number];
 
 /** spells only lords/items grant (SpellDef.lordOnly — never rolled in the shop) */
 export const LORD_SPELL_IDS = ['charge_of_darkness', 'sleight_of_fist'] as const;
 export type LordSpellId = (typeof LORD_SPELL_IDS)[number];
 
 export const SPELL_IDS = [
-  ...Object.values(SIGNATURE_SPELLS),
+  ...(Object.values(SIGNATURE_SPELLS).filter((id) => !(KIT_SPELL_IDS_D as readonly string[]).includes(id)) as Exclude<(typeof SIGNATURE_SPELLS)[HeroId], KitSpellIdD>[]),
   ...SHOP_SPELL_IDS,
   ...KIT_SPELL_IDS_A,
   ...KIT_SPELL_IDS_B,
   ...KIT_SPELL_IDS_C,
+  ...KIT_SPELL_IDS_D,
   ...LORD_SPELL_IDS,
 ] as const;
-export type SpellId = BaseSpellId | KitSpellIdA | KitSpellIdB | KitSpellIdC | LordSpellId;
+export type SpellId = BaseSpellId | KitSpellIdA | KitSpellIdB | KitSpellIdC | KitSpellIdD | LordSpellId;
 
 /**
  * Every hero's default abilities, like Dota: [Q, W, E, R] — three normal skills then the ULTIMATE
@@ -129,6 +146,10 @@ export const HERO_KITS = {
   dragon_knight: ['breathe_fire', 'dragon_tail', 'dragon_blood', 'elder_dragon_form'],
   windranger: ['shackleshot', 'powershot', 'windrun', 'focus_fire'],
   jakiro: ['dual_breath', 'ice_path', 'liquid_fire', 'macropyre'],
+  riki: ['smoke_screen', 'blink_strike', 'cloak_and_dagger', 'tricks_of_the_trade'],
+  clinkz: ['strafe', 'tar_bomb', 'death_pact', 'burning_army'],
+  spectre: ['spectral_dagger', 'desolate', 'dispersion', 'haunt'],
+  muerta: ['dead_shot', 'the_calling', 'gunslinger', 'pierce_the_veil'],
 } as const satisfies Record<HeroId, readonly [SpellId, SpellId, SpellId, SpellId]>;
 
 export const ITEM_IDS = [
@@ -189,5 +210,6 @@ export const LORD_IDS = [
   'juggernaut_lord', // Heroic Reinforcement
   'luna', // Lunar Blessing
   'phantom_assassin_lord', // Phantom Strike
+  'bloodseeker', // Bloodrage
 ] as const;
 export type LordId = (typeof LORD_IDS)[number];

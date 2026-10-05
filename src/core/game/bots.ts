@@ -270,8 +270,14 @@ function tryBuyItem(s: GS, p: PlayerState): boolean {
 function useLord(s: GS, p: PlayerState, phase: 'start' | 'end') {
   if (!lordActiveAvailable(p)) return;
   if (p.lordId === 'bounty_hunter' && phase === 'start') {
+    // one cash-in per match: wait for a fat bank, or cash in to afford a tavern upgrade / late game
     const bank = p.lordState.bank ?? 0;
-    if (bank >= 6 || s.round >= 8) useLordAbilityM(s, p.id);
+    const upCost = shopUpgradeCost(p.shopLevel);
+    const forTavern = p.shopLevel < MAX_SHOP_LEVEL && p.coins < upCost && p.coins + bank >= upCost && bank >= 3;
+    if (bank >= 6 || forTavern || s.round >= 12) useLordAbilityM(s, p.id);
+  } else if (p.lordId === 'bloodseeker' && phase === 'start') {
+    // only gamble when confident: healthy and won last round
+    if (p.hp > 60 && p.lastResult === 'win') useLordAbilityM(s, p.id);
   } else if (p.lordId === 'omniknight' && phase === 'start' && s.round >= 3) {
     const target = bestHeroes(p, s.round)[0];
     if (target && target.level <= 18) useLordAbilityM(s, p.id, target.uid);

@@ -2874,3 +2874,45 @@ body {
   color: var(--gold);
   font-weight: 600;
 }
+
+/* Bloodseeker: Bloodrage armed · Bounty Hunter: stored gold */
+.key-wrap.lord-armed .key-btn {
+  border-color: #ff4d5a;
+  animation: lord-armed-pulse 1.1s ease-in-out infinite;
+}
+.key-wrap.lord-armed .key-badge {
+  background: #c81e2c;
+  color: #fff;
+}
+.key-wrap.lord-armed .key-label {
+  color: #ff6b75;
+  font-weight: 800;
+}
+@keyframes lord-armed-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba(255, 60, 70, 0.45), inset 0 0 6px rgba(255, 60, 70, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(255, 60, 70, 0.95), inset 0 0 12px rgba(255, 60, 70, 0.5);
+  }
+}
+.key-wrap.lord-bank .key-badge {
+  background: linear-gradient(180deg, #ffd977, #c98d1d);
+  color: #2a1a02;
+  font-weight: 900;
+}
+.key-wrap.lord-bank .key-label {
+  color: var(--gold);
+  font-weight: 800;
+}
+.hp-blood {
+  margin-left: 4px;
+  font-size: 11px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .key-wrap.lord-armed .key-btn {
+    animation: none;
+    box-shadow: 0 0 12px rgba(255, 60, 70, 0.8);
+  }
+}

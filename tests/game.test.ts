@@ -449,18 +449,91 @@ describe('lords', () => {
     expect(b.players[0]!.heroes[0]!.level).toBe(START_HERO_LEVEL);
   });
 
-  test('bounty hunter banks unspent coins', () => {
-    let b = prepGame(1, 'bounty_hunter');
-    const coins = b.players[0]!.coins;
-    b = G.readyForBattle(b);
-    expect(b.players[0]!.lordState.bank).toBe(coins);
-    b = G.finishBattle(b);
-    if (b.phase === 'results') {
-      b = G.nextRound(b);
-      b = G.useLordAbility(b, 0);
-      expect(b.players[0]!.lordState.bank).toBe(0);
-      expect(b.players[0]!.coins).toBeGreaterThanOrEqual(incomeForRound(2) + coins);
-    }
+  /** jump to the next round's prep (no battle) */
+  function skipRound(s: GameState): GameState {
+    const c = structuredClone(s);
+    c.phase = 'results';
+    return G.nextRound(c);
+  }
+
+  test('bounty hunter: stores 1 coin per round, one cash-in, nothing after', () => {
+    let s = prepGame(1, 'bounty_hunter');
+    expect(s.players[0]!.lordState.bank).toBe(0);
+    expect(G.lordActiveAvailable(s.players[0]!)).toBe(false);
+    for (let i = 0; i < 4; i++) s = skipRound(s);
+    expect(s.round).toBe(5);
+    expect(s.players[0]!.lordState.bank).toBe(4);
+    // unspent coins are NOT banked any more
+    const coins = s.players[0]!.coins;
+    s = G.useLordAbility(s, 0);
+    expect(s.players[0]!.coins).toBe(coins + 4);
+    expect(s.players[0]!.lordState.bank).toBe(0);
+    expect(s.players[0]!.lordState.used).toBe(1);
+    expect(G.lordActiveAvailable(s.players[0]!)).toBe(false);
+    s = skipRound(skipRound(s));
+    expect(s.players[0]!.lordState.bank).toBe(0);
+    const again = G.useLordAbility(s, 0);
+    expect(again.players[0]!.coins).toBe(s.players[0]!.coins);
+  });
+
+  /** player 0 (bloodseeker) vs player 1 with a forced outcome, then finishBattle */
+  function bloodBattle(outcome: 'win' | 'loss' | 'draw', ghost = false) {
+    let s = G.useLordAbility(prepGame(1, 'bloodseeker'), 0);
+    const c = structuredClone(s) as G.GS;
+    c.phase = 'battle';
+    const winner = outcome === 'win' ? 'left' : outcome === 'loss' ? 'right' : 'draw';
+    c.reports = [{ round: 1, pairing: { left: 0, right: 1, ghost }, winner, damageToLoser: 10, duration: 1, seed: 1 }];
+    c.pendingResult = outcome === 'win' ? (ghost ? { 0: 'win' } : { 0: 'win', 1: 'loss' }) : outcome === 'loss' ? { 0: 'loss', 1: 'win' } : { 0: 'draw', 1: 'draw' };
+    c.pendingDamage = outcome === 'win' ? (ghost ? {} : { 1: 10 }) : outcome === 'loss' ? { 0: 10 } : { 0: 5, 1: 5 };
+    return { before: s, after: G.finishBattle(c) };
+  }
+
+  test('bloodseeker: costs 40 HP, needs > 40 HP, once per round', () => {
+    const s = prepGame(1, 'bloodseeker');
+    const t1 = G.useLordAbility(s, 0);
+    expect(t1.players[0]!.hp).toBe(PLAYER_START_HP - 40);
+    expect(t1.players[0]!.lordState.bloodrage).toBe(1);
+    expect(t1.players[0]!.coins).toBe(s.players[0]!.coins);
+    expect(G.lordActiveAvailable(t1.players[0]!)).toBe(false);
+    expect(G.useLordAbility(t1, 0).players[0]!.hp).toBe(PLAYER_START_HP - 40);
+    const low = structuredClone(s);
+    low.players[0]!.hp = 40;
+    expect(G.lordActiveAvailable(low.players[0]!)).toBe(false);
+    expect(G.useLordAbility(low, 0).players[0]!.hp).toBe(40);
+    expect(G.useLordAbility(low, 0).players[0]!.lordState.bloodrage).toBe(0);
+  });
+
+  test('bloodseeker win: +100 HP (net +60, may exceed max) and +50 damage to the loser', () => {
+    const { before, after } = bloodBattle('win');
+    expect(after.players[0]!.hp).toBe(PLAYER_START_HP - 40 + 100);
+    expect(after.players[1]!.hp).toBe(before.players[1]!.hp - 10 - 50);
+    expect(after.players[0]!.lordState.bloodrage).toBe(0);
+    // a lower-HP bloodseeker gets the full +100
+    let s = structuredClone(prepGame(1, 'bloodseeker'));
+    s.players[0]!.hp = 50;
+    s = G.useLordAbility(s, 0);
+    const c = structuredClone(s) as G.GS;
+    c.phase = 'battle';
+    c.reports = [{ round: 1, pairing: { left: 1, right: 0, ghost: false }, winner: 'right', damageToLoser: 10, duration: 1, seed: 1 }];
+    c.pendingResult = { 0: 'win', 1: 'loss' };
+    c.pendingDamage = { 1: 10 };
+    expect(G.finishBattle(c).players[0]!.hp).toBe(110); // uncapped heal
+  });
+
+  test('bloodseeker win vs ghost: heal, no extra damage', () => {
+    const { before, after } = bloodBattle('win', true);
+    expect(after.players[0]!.hp).toBe(PLAYER_START_HP + 60);
+    expect(after.players[1]!.hp).toBe(before.players[1]!.hp);
+  });
+
+  test('bloodseeker loss/draw: the 40 HP is gone + normal damage, flag resets', () => {
+    const l = bloodBattle('loss');
+    expect(l.after.players[0]!.hp).toBe(PLAYER_START_HP - 40 - 10);
+    expect(l.after.players[1]!.hp).toBe(l.before.players[1]!.hp);
+    expect(l.after.players[0]!.lordState.bloodrage).toBe(0);
+    const d = bloodBattle('draw');
+    expect(d.after.players[0]!.hp).toBe(PLAYER_START_HP - 40 - 5);
+    expect(d.after.players[1]!.hp).toBe(d.before.players[1]!.hp - 5);
   });
 
   test('team mods: axe cull, invoker refund, zeus bolt, phantom strike', () => {

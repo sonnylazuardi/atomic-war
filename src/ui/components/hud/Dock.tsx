@@ -19,14 +19,15 @@ interface KeyProps {
   active?: boolean;
   badge?: ReactNode;
   poor?: boolean;
+  className?: string;
   onClick: () => void;
   tipBody?: () => ReactNode;
   children: ReactNode;
 }
 
-function KeyButton({ k, label, testid, disabled, active, badge, poor, onClick, tipBody, children }: KeyProps) {
+function KeyButton({ k, label, testid, disabled, active, badge, poor, className, onClick, tipBody, children }: KeyProps) {
   return (
-    <div className="key-wrap">
+    <div className={`key-wrap${className ? ` ${className}` : ''}`}>
       <button
         className={`key-btn ${active ? 'active' : ''}`}
         data-testid={testid}
@@ -56,7 +57,7 @@ export function Dock({ shopOpen, onToggleShop }: { shopOpen: boolean; onToggleSh
   const lord = me.lordId ? lordDef(me.lordId) : null;
   const lordActive = lord?.kind === 'active';
   const ls = lordStatus(me, lord, round);
-  const lordReady = lordActive && !ls.poor && safe(() => lordActiveAvailable(me), true);
+  const lordReady = lordActive && !ls.poor && !ls.disabled && safe(() => lordActiveAvailable(me), true);
   const upCost = shopUpgradeCost(me.shopLevel);
   const maxed = me.shopLevel >= MAX_SHOP_LEVEL;
   const refresh = safe(() => refreshCostFor(me), 1);
@@ -84,6 +85,7 @@ export function Dock({ shopOpen, onToggleShop }: { shopOpen: boolean; onToggleSh
         active={lordTargeting}
         badge={ls.badge}
         poor={ls.poor}
+        className={`${ls.armed ? 'lord-armed' : ''}${me.lordId === 'bounty_hunter' && !ls.disabled ? ' lord-bank' : ''}`}
         onClick={triggerLord}
         tipBody={lordTipBody}
       >

@@ -4,6 +4,7 @@ import type { HeroId, LordId } from '../../core/types.ts';
 import { getHeroArt } from '../registry.tsx';
 import type { HeroArt } from '../types.ts';
 import { AlchemistLord } from './alchemist.tsx';
+import { BloodseekerLord } from './bloodseeker.tsx';
 import { BountyHunterLord } from './bountyHunter.tsx';
 import { OmniknightLord } from './omniknight.tsx';
 import { EmberSpiritLord } from './emberSpirit.tsx';
@@ -38,6 +39,7 @@ const BESPOKE: Partial<Record<LordId, HeroArt>> = {
   riki: RikiLord,
   invoker: InvokerLord,
   luna: LunaLord,
+  bloodseeker: BloodseekerLord,
 };
 
 export function getLordArt(id: LordId): HeroArt {

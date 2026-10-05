@@ -6,6 +6,7 @@ import { meOf } from '../../me.ts';
 import { useGame } from '../../store.ts';
 import { lordDef, spellDef } from '../defs.ts';
 import type { DragPayload } from '../dnd.ts';
+import { lordStatus } from './lordStatus.ts';
 import { useUi } from '../uiState.ts';
 
 export const me = () => meOf(useGame.getState());
@@ -98,7 +99,8 @@ export function triggerLord() {
   if (l.kind !== 'active') return;
   const ui = useUi.getState();
   if (ui.lordTargeting) return ui.setLordTargeting(false);
-  if ((l.cost ?? 0) > p.coins) return;
+  const ls = lordStatus(p, l, g.round);
+  if (ls.poor || ls.disabled) return;
   if (!safe(() => lordActiveAvailable(p), true)) return;
   if (l.needsTarget) ui.setLordTargeting(true);
   else g.useLordAbility();

@@ -1,5 +1,5 @@
 // Hero art group 2: zeus, enigma, tinker, medusa, drow_ranger, sniper, crystal_maiden, dazzle,
-// dragon_knight, windranger, jakiro
+// dragon_knight, windranger, jakiro, riki, clinkz, spectre, muerta
 import type { HeroArt } from '../types.ts';
 import type { HeroId } from '../../core/types.ts';
 import { CrystalMaiden } from './crystal_maiden.tsx';
@@ -12,6 +12,10 @@ import { Medusa } from './medusa.tsx';
 import { Sniper } from './sniper.tsx';
 import { Tinker } from './tinker.tsx';
 import { Windranger } from './windranger.tsx';
+import { Clinkz } from './clinkz.tsx';
+import { Muerta } from './muerta.tsx';
+import { Riki } from './riki.tsx';
+import { Spectre } from './spectre.tsx';
 import { Zeus } from './zeus.tsx';
 
 export const heroArtGroup2: Partial<Record<HeroId, HeroArt>> = {
@@ -26,4 +30,8 @@ export const heroArtGroup2: Partial<Record<HeroId, HeroArt>> = {
   dragon_knight: DragonKnight,
   windranger: Windranger,
   jakiro: Jakiro,
+  riki: Riki,
+  clinkz: Clinkz,
+  spectre: Spectre,
+  muerta: Muerta,
 };

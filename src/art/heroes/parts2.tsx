@@ -435,3 +435,19 @@ export function AghanimCrown({ size = 14, glow = 0 }: { size?: number; glow?: nu
     </g>
   );
 }
+
+/** flickering flame tongue standing on (x,y), height h, half-width w */
+export function Flame({ x, y, h, w, t, seed = 0, o = 1, lean = 0 }: { x: number; y: number; h: number; w: number; t: number; seed?: number; o?: number; lean?: number }) {
+  if (h <= 0.2 || o <= 0.01) return null;
+  const hh = h * (0.85 + 0.15 * Math.sin(t * 17 + seed * 3.1));
+  const sw = Math.sin(t * 11 + seed * 1.7) * w * 0.6 + lean;
+  const d = (k: number) =>
+    `M${r2(x - w * k)},${r2(y)} Q${r2(x - w * k * 1.1)},${r2(y - hh * k * 0.55)} ${r2(x + sw * k)},${r2(y - hh * k)} Q${r2(x + w * k * 1.1)},${r2(y - hh * k * 0.5)} ${r2(x + w * k)},${r2(y)} Q${r2(x)},${r2(y + w * k * 0.6)} ${r2(x - w * k)},${r2(y)}Z`;
+  return (
+    <g opacity={r2(o)}>
+      <path d={d(1)} fill="#ff5a12" />
+      <path d={d(0.68)} fill="#ff9a2e" />
+      <path d={d(0.38)} fill="#ffe14d" />
+    </g>
+  );
+}

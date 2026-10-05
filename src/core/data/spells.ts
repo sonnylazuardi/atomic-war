@@ -6,6 +6,7 @@ import { KIT_SPELLS_A } from './kitA.ts';
 import { KIT_SPELLS_B } from './kitB.ts';
 import { KIT_SPELLS_C } from './kitC.ts';
 import { LORD_SPELLS } from './lordSpells.ts';
+import { KIT_SPELLS_D } from './kitD.ts';
 
 /** hero signatures + original shop spells; the hero-kit spells live in kitA/B/C.ts */
 const BASE_SPELLS: Record<BaseSpellId, SpellDef> = {
@@ -1139,4 +1140,4 @@ const BASE_SPELLS: Record<BaseSpellId, SpellDef> = {
   },
 };
 
-export const SPELLS: Record<SpellId, SpellDef> = { ...BASE_SPELLS, ...KIT_SPELLS_A, ...KIT_SPELLS_B, ...KIT_SPELLS_C, ...LORD_SPELLS };
+export const SPELLS: Record<SpellId, SpellDef> = { ...BASE_SPELLS, ...KIT_SPELLS_A, ...KIT_SPELLS_B, ...KIT_SPELLS_C, ...KIT_SPELLS_D, ...LORD_SPELLS };

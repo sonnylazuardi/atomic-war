@@ -52,6 +52,11 @@ export function PlayerList({ opponent }: { opponent: number | null }) {
             <div className="hp-main">
               <div className="hp-name">
                 {p.name}
+                {p.lordId === 'bloodseeker' && p.lordState?.bloodrage === 1 && p.alive && (
+                  <span className="hp-blood" data-testid="bloodrage-armed" title="Bloodrage armed">
+                    🩸
+                  </span>
+                )}
                 {phase === 'prep' && p.ready && p.alive && (
                   <span className="hp-ready" data-testid="ready-check" title="Ready">
                     ✓

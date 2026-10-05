@@ -22,7 +22,7 @@ import type {
   Team,
 } from '../types.ts';
 import { botPickLord, botPrepM } from './bots.ts';
-import { applyLordPick, heroModsFor, lordIncomeBonus, lordSummon, onLeavePrep, onRoundStart, teamModsFor } from './lords.ts';
+import { applyLordPick, heroModsFor, resolveBloodrage, lordIncomeBonus, lordSummon, onLeavePrep, onRoundStart, teamModsFor } from './lords.ts';
 import { emptyShop, rollShop } from './shop.ts';
 import { fail, fighters, log, pure, withRng, type GS, type PendingGains } from './util.ts';
 
@@ -349,6 +349,7 @@ export function finishBattleM(s: GS) {
   const damage = s.pendingDamage ?? {};
   const results = s.pendingResult ?? {};
   const aliveBefore = s.players.filter((p) => p.alive);
+  const bloodHeals = resolveBloodrage(s, results, damage);
 
   for (const p of aliveBefore) {
     const g = gains[p.id] ?? {};
@@ -374,6 +375,7 @@ export function finishBattleM(s: GS) {
     }
   }
 
+  for (const heal of bloodHeals) heal(); // Bloodrage winners get their HP back
   const dead = aliveBefore.filter((p) => p.hp <= 0).sort((a, b) => a.hp - b.hp || b.id - a.id);
   let place = aliveBefore.length;
   for (const p of dead) {

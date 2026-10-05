@@ -26,12 +26,18 @@ const ICONS: Record<LordId, ReactNode> = {
   ),
   bounty_hunter: (
     <g>
-      <path d="M12,16 Q8,26 12,32 Q20,36 28,32 Q32,26 28,16 Z" {...o('#a07a44')} />
-      <path d="M13,16 Q20,11 27,16 L25,12 Q20,9 15,12 Z" {...o('#7d5634', 1.3)} />
-      <circle cx={20} cy={25} r={5} {...o('#f2c14e', 1.3)} />
-      <path d="M20,22 L20,28" stroke="#b8842a" strokeWidth={1.6} />
-      <ellipse cx={31} cy={10} rx={3.4} ry={3.4} {...o('#f2c14e', 1.2)} />
-      <ellipse cx={9} cy={9} rx={2.6} ry={2.6} {...o('#f2c14e', 1.1)} />
+      <path d="M5,30 Q3,20 9,15 Q14,12 18,15 Q22,20 20,30 Q13,34 5,30 Z" {...o('#a07a44')} />
+      <path d="M8,15 Q12,11 17,15 L16,11 Q12,9 9,11 Z" {...o('#7d5634', 1.2)} />
+      <path d="M8,13 L17,13" stroke="#d9a12a" strokeWidth={1.6} />
+      <text x={12.5} y={27} textAnchor="middle" fontSize={9} fontWeight={900} fill="#f2c14e" stroke={OL} strokeWidth={0.6}>$</text>
+      {[0, 1, 2, 3].map((i) => (
+        <g key={i}>
+          <ellipse cx={28} cy={33 - i * 4.4} rx={7} ry={2.6} {...o('#f2c14e', 1.2)} />
+          <path d={`M21,${33 - i * 4.4} L21,${35 - i * 4.4} Q28,${38 - i * 4.4} 35,${35 - i * 4.4} L35,${33 - i * 4.4}`} fill="#b8842a" stroke={OL} strokeWidth={1} />
+        </g>
+      ))}
+      <ellipse cx={28} cy={19.8} rx={7} ry={2.6} {...o('#ffe08a', 1.2)} />
+      <path d="M33,8 l1.2,2.6 2.6,1.2 -2.6,1.2 -1.2,2.6 -1.2,-2.6 -2.6,-1.2 2.6,-1.2 Z" fill="#fff" />
     </g>
   ),
   omniknight: (
@@ -164,6 +170,16 @@ const ICONS: Record<LordId, ReactNode> = {
       <path d="M15,30 L11,26 M17,34 L13,36" stroke={OL} strokeWidth={4} strokeLinecap="round" />
       <path d="M15,30 L11,26 M17,34 L13,36" stroke="#6b4a8a" strokeWidth={2} strokeLinecap="round" />
       <path d="M33,10 l3,-3" stroke="#ff5a5a" strokeWidth={2} strokeLinecap="round" />
+    </g>
+  ),
+  bloodseeker: (
+    <g>
+      <circle cx={20} cy={21} r={14} fill="#ff2a2a" opacity={0.25} />
+      <path d="M20,4 Q30,18 29,25 Q28,34 20,34 Q12,34 11,25 Q10,18 20,4 Z" {...o('#c8101a', 1.6)} />
+      <path d="M15,22 Q14,27 17,30" fill="none" stroke="#ff8a8a" strokeWidth={1.6} strokeLinecap="round" />
+      <path d="M15,19 L19,22 M25,19 L21,22" stroke={OL} strokeWidth={2.4} strokeLinecap="round" />
+      <path d="M16,27 Q20,24 24,27" fill="none" stroke={OL} strokeWidth={1.8} strokeLinecap="round" />
+      <path d="M6,10 l3,3 M34,10 l-3,3 M5,22 l3,0 M35,22 l-3,0" stroke="#ff4a3a" strokeWidth={1.8} strokeLinecap="round" />
     </g>
   ),
 };
