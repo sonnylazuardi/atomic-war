@@ -25,7 +25,7 @@ import type { TerrainFade } from './world/terrainLayers.tsx';
 import { FormationTiles, sameSlot, slotAt, slotPos } from './world/FormationTiles.tsx';
 import { WORLD_CSS } from './world/worldCss.ts';
 import { BeaconBack, BeaconFront, LevelUpBurst, UpgradeDefs } from './world/upgradeFx.tsx';
-import { battleEvents, sfx } from '../../audio/sfx.ts';
+import { battleEnd, battleEvents, battleStart, sfx } from '../../audio/sfx.ts';
 
 export interface WorldProps {
   /** prep: human's own arena, own board heroes idle at their slots. battle: teleport-in, playback, teleport-home. */
@@ -393,6 +393,7 @@ function startOutro(ws: WS, run: Run, actorsCount: number) {
       run.vanish.set(u.uid, now + 0.75);
     }
   }
+  battleEnd();
   if (units.some((u) => u.alive)) sfx.teleport(0.6);
   run.outroHome = run.visiting ? now + gone : Infinity;
   run.outroReturn = now + gone + (run.visiting ? 0.3 : 0.05);
@@ -552,6 +553,7 @@ export function World(props: WorldProps) {
           if (now - run.phaseStart >= run.introLen) {
             run.phase = 'play';
             run.phaseStart = now;
+            battleStart();
           }
         } else if (run.phase === 'play') {
           let dtB = 0;
@@ -561,7 +563,7 @@ export function World(props: WorldProps) {
           }
           pb.maxTexts = perfRef.current.richVfx ? 36 : 12;
           const crossed = advance(pb, dtB);
-          if (crossed.length) battleEvents(crossed, run.speed);
+          if (crossed.length) battleEvents(crossed, run.speed, pb.view.units);
           if (pb.t >= pb.end) startOutro(ws, run, ws.actors.size);
         } else if (run.phase === 'outro') {
           pb.effects = pruneEffects(pb.effects, pb.t + (now - run.phaseStart), pb.maxTexts);

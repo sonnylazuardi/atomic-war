@@ -124,7 +124,22 @@ function create(): Graph | null {
     music.connect(master);
     const sfx = ctx.createGain();
     sfx.gain.value = perceptual(settings.sfx) * SFX_BASE;
-    sfx.connect(master);
+    // gentle tanh soft-clip so stacked battle hits round off instead of spiking the compressor
+    const clip = ctx.createWaveShaper();
+    const N = 2048;
+    const curve = new Float32Array(N);
+    const drive = 1.6;
+    for (let i = 0; i < N; i++) {
+      const x = (i / (N - 1)) * 2 - 1;
+      curve[i] = Math.tanh(drive * x) / Math.tanh(drive);
+    }
+    clip.curve = curve;
+    clip.oversample = '2x';
+    const trim = ctx.createGain();
+    trim.gain.value = 0.58; // the shaper has ~1.74x small-signal gain: keep quiet sounds where they were
+    sfx.connect(clip);
+    clip.connect(trim);
+    trim.connect(master);
     // 1 s of white noise shared by every percussive / whoosh sound
     const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const d = noise.getChannelData(0);

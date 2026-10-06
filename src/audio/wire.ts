@@ -9,7 +9,8 @@ import { useRoute } from '../ui/screens/codex/route.ts';
 import { ctxState, getSettings, initAudio, toggleMute } from './engine.ts';
 import { duck, musicState, setMood, startMusic } from './music.ts';
 import type { Mood } from './music.ts';
-import { sfx } from './sfx.ts';
+import { battleEnd, sfx, sfxCounts } from './sfx.ts';
+import { bedState } from './bed.ts';
 
 type Snap = Pick<GameState, 'phase' | 'round' | 'seed' | 'selfId' | 'players' | 'phaseDeadline'>;
 
@@ -57,36 +58,55 @@ function diff(prev: Snap, next: Snap) {
   if (!a.ready && b.ready) sfx.ready();
 }
 
+/** stingers already played: one per round (`seed:round`) and one per game (`seed:over`) */
+const stung = new Set<string>();
+
 function onPhase(prev: Snap, next: Snap) {
   setMood(moodFor(next.phase));
+  if (next.phase !== 'battle') battleEnd();
   if (prev.seed !== next.seed) return;
   const me = selfOf(next);
-  if (prev.phase === 'prep' && next.phase === 'battle') sfx.roundStart();
-  if (prev.phase === 'battle' && next.phase === 'results' && me) {
-    duck(2.4);
-    if (me.lastResult === 'win') sfx.victory();
-    else if (me.lastResult === 'loss') sfx.defeat();
-    else sfx.draw();
+  if (prev.phase === 'prep' && next.phase === 'battle') sfx.go();
+  if (next.phase === 'results' && prev.phase !== 'results' && me?.lastResult) {
+    const key = `${next.seed}:${next.round}`;
+    if (!stung.has(key)) {
+      stung.add(key);
+      duck(2.6);
+      if (me.lastResult === 'win') sfx.victory();
+      else if (me.lastResult === 'loss') sfx.defeat();
+      else sfx.draw();
+    }
   }
   if (next.phase === 'game_over' && prev.phase !== 'game_over') {
-    duck(4, 0.12);
-    sfx.gameOver(me?.placement === 1);
+    const key = `${next.seed}:over`;
+    if (!stung.has(key)) {
+      stung.add(key);
+      duck(4.5, 0.1);
+      sfx.gameOver(me?.placement === 1);
+    }
   }
 }
 
-// ---------------------------------------------------------------- timer ticks (last 5 s of prep)
+// ---------------------------------------------------------------- countdown (last 5 s of every prep)
 
-let lastTick: number | null = null;
+let counted = new Set<number>();
+let countKey = '';
+/** polled every 100 ms; each beep is scheduled on the audio clock exactly at its second boundary */
 function timerTick() {
   const s = useGame.getState();
-  if (s.phase !== 'prep' || s.phaseDeadline == null || !inGameMode()) {
-    lastTick = null;
-    return;
+  if (s.phase !== 'prep' || s.phaseDeadline == null || !inGameMode()) return;
+  const key = `${s.seed}:${s.round}`;
+  if (key !== countKey) {
+    countKey = key;
+    counted = new Set();
   }
-  const left = Math.ceil((s.phaseDeadline - Date.now()) / 1000);
-  if (left >= 1 && left <= 5 && left !== lastTick) {
-    lastTick = left;
-    sfx.tick(left === 1);
+  const ms = s.phaseDeadline - Date.now();
+  for (let n = 5; n >= 1; n--) {
+    if (counted.has(n)) continue;
+    const at = ms - n * 1000; // ms until "n seconds left"
+    if (at > 150) continue;
+    counted.add(n); // once per second per round, whatever re-renders or deadline re-syncs happen
+    if (at > -250) sfx.countdown(n, Math.max(0, at) / 1000); // a missed beat (hidden tab, late join) stays silent
   }
 }
 
@@ -134,11 +154,11 @@ export function initAudioWiring() {
     });
     useMode.subscribe(() => setMood(moodFor(useGame.getState().phase)));
     useRoute.subscribe(() => setMood(moodFor(useGame.getState().phase)));
-    setInterval(timerTick, 200);
+    setInterval(timerTick, 100);
     window.addEventListener('keydown', onKey);
     window.addEventListener('click', onClick, true);
     (window as unknown as { __awAudio?: unknown }).__awAudio = {
-      state: () => ({ ctx: ctxState(), settings: getSettings(), music: musicState() }),
+      state: () => ({ ctx: ctxState(), settings: getSettings(), music: musicState(), bed: bedState(), sfx: { ...sfxCounts } }),
     };
   } catch {
     // no audio at all is fine

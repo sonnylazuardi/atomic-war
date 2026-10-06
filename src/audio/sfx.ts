@@ -6,6 +6,8 @@ import { SPELLS } from '../core/data/index.ts';
 import { getSettings, live } from './engine.ts';
 import type { Graph } from './engine.ts';
 import { fm, mtof, noise, tone } from './synth.ts';
+import { attackImpact, attackRelease } from './weapons.ts';
+import { battleBed, bump } from './bed.ts';
 
 const jitter = (amt = 0.05) => 1 + (Math.random() * 2 - 1) * amt;
 
@@ -42,9 +44,16 @@ function budget(kind: string, max: number, win = 0.1): boolean {
   return true;
 }
 
+/** how many times each sound actually played (diagnostics: headless checks can't listen) */
+export const sfxCounts: Record<string, number> = {};
+const count = (k: string) => {
+  sfxCounts[k] = (sfxCounts[k] ?? 0) + 1;
+};
+
 function play(name: string, gap: number, fn: (g: Graph, t: number, o: AudioNode) => void, delay = 0) {
   const g = out();
   if (!g || !gate(name, gap, delay)) return;
+  count(name.replace(/^cast:.*/, 'cast'));
   try {
     fn(g, g.ctx.currentTime + 0.005 + Math.max(0, delay), g.sfx);
   } catch {
@@ -123,36 +132,37 @@ export const sfx = {
     });
   },
 
-  tick(last = false) {
-    play('tick', 0.3, (g, t, o) => {
-      tone(g.ctx, { freq: last ? 1320 : 990, t, a: 0.002, d: 0.06, g: last ? 0.09 : 0.06, out: o });
-      noise(g.ctx, g.noise, { t, a: 0.001, d: 0.012, g: 0.04, filter: { type: 'bandpass', freq: 3000, q: 3 }, out: o });
-    });
+  /** prep countdown beep for `n` seconds left (5..1): soft wood-block ticks, then brighter beeps */
+  countdown(n: number, delay = 0) {
+    play(
+      `count${n}`,
+      0.5,
+      (g, t, o) => {
+        if (n >= 3) {
+          // wood block: rising a step per second
+          const f = n === 5 ? 820 : n === 4 ? 920 : 1040;
+          tone(g.ctx, { type: 'triangle', freq: f, t, a: 0.001, d: 0.07, g: 0.13, out: o });
+          tone(g.ctx, { freq: f * 2.6, t, a: 0.001, d: 0.025, g: 0.03, out: o });
+          noise(g.ctx, g.noise, { t, a: 0.001, d: 0.015, g: 0.06, filter: { type: 'bandpass', freq: f * 2, q: 4 }, out: o });
+        } else {
+          // brighter, more urgent beeps
+          const f = n === 2 ? 1175 : 1397;
+          tone(g.ctx, { type: 'square', freq: f, t, a: 0.003, hold: 0.07, d: 0.12, g: 0.045, filter: { type: 'lowpass', freq: 4200 }, out: o });
+          tone(g.ctx, { type: 'triangle', freq: f * 2, t, a: 0.003, hold: 0.05, d: 0.1, g: 0.03, out: o });
+          if (n === 1) tone(g.ctx, { type: 'square', freq: f, t: t + 0.13, a: 0.003, hold: 0.05, d: 0.1, g: 0.035, filter: { type: 'lowpass', freq: 4200 }, out: o });
+        }
+      },
+      delay,
+    );
   },
 
-  roundStart() {
-    play('horn', 0.5, (g, t, o) => {
-      for (const [m, det] of [
-        [50, -6],
-        [50, 6],
-        [57, 0],
-        [62, 3],
-      ] as const) {
-        tone(g.ctx, {
-          type: 'sawtooth',
-          freq: mtof(m),
-          detune: det,
-          t,
-          a: 0.22,
-          hold: 0.35,
-          d: 0.5,
-          g: 0.05,
-          filter: { type: 'lowpass', freq: 300, to: 1700, q: 1.2 },
-          vib: { rate: 5, depth: 8 },
-          out: o,
-        });
-      }
-      kickish(g, t, o, 0.6);
+  /** battle start: punchy drum + brass stab + crash */
+  go() {
+    play('go', 1, (g, t, o) => {
+      tone(g.ctx, { freq: 150, to: 42, glide: 0.12, t, a: 0.002, d: 0.35, g: 0.6, out: o });
+      noise(g.ctx, g.noise, { t, a: 0.001, d: 0.09, g: 0.2, filter: { type: 'lowpass', freq: 2200 }, out: o });
+      for (const m of [50, 57, 62, 66]) brass(g, o, t + 0.01, m, 0.03, 0.4, 0.045);
+      noise(g.ctx, g.noise, { t: t + 0.01, a: 0.004, d: 0.9, g: 0.07, filter: { type: 'highpass', freq: 5500 }, out: o });
     });
   },
 
@@ -189,24 +199,43 @@ export const sfx = {
 
   // ---------------------------------------------------------------- battle
 
-  hit(speed = 1) {
-    if (!budget('hit', speed >= 4 ? 2 : speed >= 2 ? 4 : 6)) return;
-    play('hit', 0.012, (g, t, o) => {
-      const p = jitter();
-      noise(g.ctx, g.noise, { t, a: 0.002, d: 0.06, g: 0.16, filter: { type: 'lowpass', freq: 1400 * p, to: 300 }, out: o });
-      tone(g.ctx, { freq: 150 * p, to: 60, t, a: 0.002, d: 0.08, g: 0.18, out: o });
-    });
+  /** an attack fires (swing / bow release / gun crack / magic launch) */
+  attack(heroId: string, speed = 1) {
+    if (!budget('atk', speed >= 4 ? 2 : speed >= 2 ? 3 : 5)) return;
+    const g = out();
+    if (!g) return;
+    try {
+      count('attack');
+      attackRelease(g, g.ctx.currentTime + 0.004 + Math.random() * 0.012, g.sfx, heroId, 1);
+    } catch {
+      // ignore
+    }
   },
 
-  crit() {
-    if (!budget('crit', 3)) return;
-    play('crit', 0.04, (g, t, o) => {
-      const p = jitter();
-      noise(g.ctx, g.noise, { t, a: 0.001, d: 0.09, g: 0.22, filter: { type: 'highpass', freq: 1800 * p }, out: o });
-      tone(g.ctx, { freq: 190 * p, to: 55, t, a: 0.002, d: 0.14, g: 0.3, out: o });
-      fm(g.ctx, { freq: 1700 * p, ratio: 3.41, index: 1.2, indexTo: 0.05, t: t + 0.005, d: 0.22, g: 0.05, out: o });
-    });
+  /** an attack's damage lands; crits are louder, layered, with a short low boom */
+  hit(heroId: string | undefined, crit = false, speed = 1) {
+    if (!crit && !budget('hit', speed >= 4 ? 2 : speed >= 2 ? 4 : 6)) return;
+    if (crit && !budget('crit', 3)) return;
+    const g = out();
+    if (!g) return;
+    try {
+      const t = g.ctx.currentTime + 0.004 + Math.random() * 0.01;
+      const o = g.sfx;
+      count(crit ? 'crit' : 'hit');
+      if (heroId) attackImpact(g, t, o, heroId, crit ? 1.6 : 1);
+      else {
+        noise(g.ctx, g.noise, { t, a: 0.002, d: 0.06, g: 0.14, filter: { type: 'lowpass', freq: 1400 * jitter(0.06), to: 300 }, out: o });
+        tone(g.ctx, { freq: 150 * jitter(0.06), to: 60, t, a: 0.002, d: 0.08, g: 0.16, out: o });
+      }
+      if (crit) {
+        noise(g.ctx, g.noise, { t, a: 0.001, d: 0.09, g: 0.2, filter: { type: 'highpass', freq: 1800 * jitter(0.06) }, out: o });
+        tone(g.ctx, { freq: 95, to: 34, glide: 0.25, t, a: 0.003, d: 0.32, g: 0.38, out: o });
+      }
+    } catch {
+      // ignore
+    }
   },
+
 
   death() {
     if (!budget('death', 3, 0.2)) return;
@@ -258,49 +287,116 @@ export const sfx = {
 
   // ---------------------------------------------------------------- stingers
 
+  /** round won: bright major brass fanfare up + cymbal swell (~2 s) */
   victory() {
-    play('sting', 1, (g, t, o) => {
-      // D major arpeggio up, then a bright chord (Picardy lift out of D minor)
-      [62, 66, 69, 74].forEach((m, i) => tone(g.ctx, { type: 'triangle', freq: mtof(m + 12), t: t + i * 0.09, a: 0.004, d: 0.3, g: 0.09, out: o }));
-      [74, 78, 81, 86].forEach((m) => {
-        tone(g.ctx, { type: 'sawtooth', freq: mtof(m), t: t + 0.36, a: 0.03, hold: 0.35, d: 0.8, g: 0.025, filter: { type: 'lowpass', freq: 2400, to: 900 }, out: o });
-        tone(g.ctx, { type: 'triangle', freq: mtof(m), t: t + 0.36, a: 0.01, hold: 0.3, d: 0.9, g: 0.05, out: o });
-      });
-      kickish(g, t + 0.36, o, 0.5);
-      noise(g.ctx, g.noise, { t: t + 0.36, a: 0.05, d: 0.9, g: 0.05, filter: { type: 'highpass', freq: 6500 }, out: o });
+    play('sting', 1.5, (g, t, o) => {
+      const steps = [62, 66, 69, 74];
+      steps.forEach((m, i) => brass(g, o, t + i * 0.11, m, 0.012, 0.1, 0.05));
+      const c = t + 0.46;
+      for (const m of [62, 69, 74, 78, 81]) brass(g, o, c, m, 0.04, 1.05, m < 70 ? 0.04 : 0.032);
+      [74, 78, 81, 86].forEach((m, i) => tone(g.ctx, { type: 'triangle', freq: mtof(m + 12), t: c + i * 0.04, a: 0.005, d: 0.5, g: 0.03, out: o }));
+      cymbal(g, o, t + 0.1, 0.36, 1.3, 0.09);
+      kickish(g, c, o, 0.7);
     });
   },
 
+  /** round lost: descending minor phrase, low gong, dark pad (~2 s) */
   defeat() {
-    play('sting', 1, (g, t, o) => {
-      [74, 72, 69, 65].forEach((m, i) => tone(g.ctx, { type: 'triangle', freq: mtof(m), t: t + i * 0.14, a: 0.006, d: 0.3, g: 0.08, out: o }));
-      [50, 53, 57].forEach((m) =>
-        tone(g.ctx, { type: 'sawtooth', freq: mtof(m), t: t + 0.56, a: 0.06, hold: 0.3, d: 0.9, g: 0.03, filter: { type: 'lowpass', freq: 900, to: 300 }, out: o }),
-      );
-      tone(g.ctx, { freq: mtof(38), t: t + 0.56, a: 0.02, hold: 0.2, d: 0.9, g: 0.2, out: o });
+    play('sting', 1.5, (g, t, o) => {
+      [74, 72, 69, 65].forEach((m, i) => {
+        tone(g.ctx, { type: 'triangle', freq: mtof(m), t: t + i * 0.16, a: 0.008, d: 0.32, g: 0.08, out: o });
+        tone(g.ctx, { type: 'sawtooth', freq: mtof(m), t: t + i * 0.16, a: 0.02, d: 0.25, g: 0.015, filter: { type: 'lowpass', freq: 1400 }, out: o });
+      });
+      const c = t + 0.64;
+      gong(g, o, c, 0.9);
+      darkPad(g, o, c, [50, 53, 57, 62], 1.4);
     });
   },
 
+  /** draw: neutral suspended chord resolving to an open fifth */
   draw() {
-    play('sting', 1, (g, t, o) => {
-      [69, 74].forEach((m, i) => tone(g.ctx, { type: 'triangle', freq: mtof(m), t: t + i * 0.16, a: 0.006, d: 0.45, g: 0.08, out: o }));
-      [62, 69].forEach((m) => tone(g.ctx, { freq: mtof(m), t: t + 0.32, a: 0.05, d: 0.8, g: 0.04, out: o }));
+    play('sting', 1.5, (g, t, o) => {
+      [62, 67, 69].forEach((m) => tone(g.ctx, { type: 'triangle', freq: mtof(m + 12), t, a: 0.02, hold: 0.3, d: 0.25, g: 0.045, out: o }));
+      [62, 66, 69].forEach((m) => tone(g.ctx, { type: 'triangle', freq: mtof(m + 12), t: t + 0.55, a: 0.03, hold: 0.2, d: 0.9, g: 0.045, out: o }));
+      [50, 57].forEach((m) => tone(g.ctx, { freq: mtof(m), t: t + 0.55, a: 0.05, d: 1.1, g: 0.06, out: o }));
+      cymbal(g, o, t + 0.2, 0.35, 0.6, 0.035);
     });
   },
 
+  /** whole game: won = long triumphant fanfare; eliminated = heavier, slower defeat */
   gameOver(won: boolean) {
-    play('gameover', 2, (g, t, o) => {
-      const seq = won ? [62, 66, 69, 74, 78, 81, 86] : [74, 72, 69, 67, 65, 62];
-      seq.forEach((m, i) => tone(g.ctx, { type: 'triangle', freq: mtof(m + (won ? 12 : 0)), t: t + i * 0.1, a: 0.005, d: 0.35, g: 0.08, out: o }));
-      const end = t + seq.length * 0.1;
-      const chord = won ? [62, 66, 69, 74, 78] : [50, 53, 57, 62];
-      chord.forEach((m) =>
-        tone(g.ctx, { type: 'sawtooth', freq: mtof(m), t: end, a: 0.08, hold: 0.8, d: 1.4, g: 0.022, filter: { type: 'lowpass', freq: won ? 2200 : 900, to: 500 }, vib: { rate: 4.5, depth: 6 }, out: o }),
-      );
-      boom(g, end, o, won ? 0.6 : 0.8);
+    play('gameover', 3, (g, t, o) => {
+      if (won) {
+        // ta-ta-ta-taaa, then IV -> I with cymbals and a boom
+        const head: [number, number, number][] = [
+          [0, 62, 0.09],
+          [0.12, 62, 0.09],
+          [0.24, 62, 0.09],
+          [0.36, 69, 0.4],
+          [0.84, 67, 0.12],
+          [1.0, 71, 0.12],
+          [1.16, 74, 0.5],
+        ];
+        for (const [dt, m, len] of head) brass(g, o, t + dt, m, 0.015, len, 0.055);
+        const iv = t + 1.75;
+        for (const m of [55, 62, 67, 71, 74]) brass(g, o, iv, m, 0.05, 0.45, 0.032);
+        const i1 = t + 2.3;
+        for (const m of [50, 57, 62, 66, 69, 74]) brass(g, o, i1, m, 0.05, 1.6, 0.03);
+        [74, 78, 81, 86, 90].forEach((m, k) => tone(g.ctx, { type: 'triangle', freq: mtof(m + 12), t: i1 + k * 0.05, a: 0.005, d: 0.7, g: 0.03, out: o }));
+        cymbal(g, o, t + 1.3, 1.0, 2.0, 0.1);
+        boom(g, i1, o, 0.8);
+      } else {
+        [62, 60, 58, 57].forEach((m, i) => {
+          tone(g.ctx, { type: 'triangle', freq: mtof(m), t: t + i * 0.34, a: 0.01, hold: 0.12, d: 0.4, g: 0.08, out: o });
+          tone(g.ctx, { type: 'sawtooth', freq: mtof(m - 12), t: t + i * 0.34, a: 0.03, hold: 0.1, d: 0.4, g: 0.02, filter: { type: 'lowpass', freq: 900 }, out: o });
+        });
+        const c = t + 1.36;
+        gong(g, o, c, 1.1);
+        gong(g, o, c + 1.1, 0.7);
+        darkPad(g, o, c, [38, 50, 53, 57], 2.4);
+        boom(g, c, o, 0.9);
+      }
     });
   },
 };
+
+/** brass-ish voice: two detuned saws through a lowpass that opens on the attack */
+function brass(g: Graph, o: AudioNode, t: number, m: number, a: number, len: number, gain: number) {
+  const f = mtof(m);
+  for (const det of [-7, 7]) {
+    tone(g.ctx, {
+      type: 'sawtooth',
+      freq: f,
+      detune: det,
+      t,
+      a: a + 0.02,
+      hold: len,
+      d: 0.25 + len * 0.3,
+      g: gain,
+      filter: { type: 'lowpass', freq: 2600, to: 900, q: 1.5 },
+      vib: len > 0.3 ? { rate: 5, depth: 7 } : undefined,
+      out: o,
+    });
+  }
+}
+
+/** cymbal swell: highpassed noise with a slow attack */
+function cymbal(g: Graph, o: AudioNode, t: number, a: number, d: number, gain: number) {
+  noise(g.ctx, g.noise, { t, a, d, g: gain, filter: { type: 'highpass', freq: 5200 }, out: o });
+  noise(g.ctx, g.noise, { t, a, d: d * 0.6, g: gain * 0.5, filter: { type: 'bandpass', freq: 8500, q: 0.8 }, out: o });
+}
+
+/** low gong: inharmonic FM with a long decay */
+function gong(g: Graph, o: AudioNode, t: number, v: number) {
+  fm(g.ctx, { freq: 73, ratio: 1.41, index: 2.5, indexTo: 0.1, t, a: 0.005, d: 2.2, g: 0.16 * v, out: o });
+  fm(g.ctx, { freq: 146, ratio: 2.76, index: 1, indexTo: 0.05, t, a: 0.005, d: 1.4, g: 0.04 * v, out: o });
+  noise(g.ctx, g.noise, { t, a: 0.002, d: 0.12, g: 0.08 * v, filter: { type: 'lowpass', freq: 500 }, out: o });
+}
+
+function darkPad(g: Graph, o: AudioNode, t: number, midis: number[], len: number) {
+  for (const m of midis)
+    tone(g.ctx, { type: 'sawtooth', freq: mtof(m), detune: (Math.random() - 0.5) * 14, t, a: 0.25, hold: len * 0.4, d: len * 0.6, g: 0.022, filter: { type: 'lowpass', freq: 650, to: 250 }, out: o });
+}
 
 function kickish(g: Graph, t: number, o: AudioNode, v: number) {
   tone(g.ctx, { freq: 130, to: 45, glide: 0.12, t, a: 0.003, d: 0.3, g: 0.5 * v, out: o });
@@ -433,32 +529,87 @@ const CASTS: Record<Element, CastFn> = {
 
 // ---------------------------------------------------------------- battle playback hook
 
-/** sounds for the events the battle playback just crossed (thinned out at fast playback speeds) */
-export function battleEvents(events: readonly BattleEvent[], speed = 1) {
-  if (!events.length || !out()) return;
+/** attacks in flight: `${src}>${dst}` -> count, so the matching damage plays the attacker's impact */
+const inFlight = new Map<string, number>();
+
+/** a battle starts / ends: reset per-battle state and the intensity bed */
+export function battleStart() {
+  inFlight.clear();
+  battleBed(true);
+}
+
+export function battleEnd() {
+  inFlight.clear();
+  battleBed(false);
+}
+
+interface UnitLike {
+  uid: string;
+  heroId: string;
+  alive: boolean;
+}
+
+/** sounds for the events the battle playback just crossed. Every event is seen exactly once (the cursor
+ *  hands each over once, even when frames are skipped); only the hit/attack sounds are thinned out. */
+export function battleEvents(events: readonly BattleEvent[], speed = 1, units: readonly UnitLike[] = []) {
+  if (!events.length) return;
+  const hero = new Map<string, string>();
+  let aliveN = 0;
+  for (const u of units) {
+    hero.set(u.uid, u.heroId);
+    if (u.alive) aliveN++;
+  }
+  const loud = !!out();
   for (const ev of events) {
     switch (ev.kind) {
-      case 'damage':
-        if (ev.crit) sfx.crit();
-        else if (ev.src && ev.dmgType === 'physical') sfx.hit(speed);
+      case 'attack': {
+        const k = `${ev.src}>${ev.dst}`;
+        inFlight.set(k, (inFlight.get(k) ?? 0) + 1);
+        const h = hero.get(ev.src);
+        if (loud && h) sfx.attack(h, speed);
         break;
-      case 'cast':
-        sfx.cast(ev.spellId, speed);
+      }
+      case 'miss': {
+        const k = `${ev.src}>${ev.dst}`;
+        const n = inFlight.get(k) ?? 0;
+        if (n > 1) inFlight.set(k, n - 1);
+        else inFlight.delete(k);
         break;
+      }
+      case 'damage': {
+        const k = ev.src ? `${ev.src}>${ev.dst}` : '';
+        const n = k ? (inFlight.get(k) ?? 0) : 0;
+        const fromAttack = n > 0;
+        if (fromAttack) {
+          if (n > 1) inFlight.set(k, n - 1);
+          else inFlight.delete(k);
+        }
+        bump(ev.crit ? 0.15 : 0.05, aliveN || undefined);
+        if (!loud) break;
+        if (fromAttack || ev.crit) sfx.hit(ev.src ? hero.get(ev.src) : undefined, ev.crit, speed);
+        break;
+      }
+      case 'cast': {
+        const ult = !!(SPELLS as Partial<Record<string, SpellDef>>)[ev.spellId]?.ultimate;
+        bump(ult ? 0.5 : 0.12);
+        if (loud) sfx.cast(ev.spellId, speed);
+        break;
+      }
       case 'proc':
-        if (speed < 4) sfx.proc();
+        if (loud && speed < 4) sfx.proc();
         break;
       case 'status':
-        if (ev.status === 'stunned') sfx.stun();
+        if (loud && ev.status === 'stunned') sfx.stun();
         break;
       case 'death':
-        sfx.death();
+        bump(0.35, aliveN || undefined);
+        if (loud) sfx.death();
         break;
       case 'heal':
-        if (speed < 2 && ev.amount > 40) sfx.heal();
+        if (loud && speed < 2 && ev.amount > 40) sfx.heal();
         break;
       case 'stack':
-        if (speed < 4) sfx.stack();
+        if (loud && speed < 4) sfx.stack();
         break;
       default:
         break;

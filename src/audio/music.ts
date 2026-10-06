@@ -5,6 +5,7 @@
 import { getSettings, live, onGraph } from './engine.ts';
 import type { Graph } from './engine.ts';
 import { fm, mtof, noise, tone } from './synth.ts';
+import { bedStep } from './bed.ts';
 
 export type Mood = 'menu' | 'prep' | 'battle';
 type Layer = 'kick' | 'hat' | 'snare' | 'bass' | 'arp' | 'pad' | 'lead';
@@ -326,6 +327,11 @@ function tick() {
       } catch (e) {
         lastError = (e as Error)?.message ?? String(e);
       }
+    }
+    try {
+      bedStep(step, bar, nextTime); // battle war drums ride the same grid
+    } catch (e) {
+      lastError = (e as Error)?.message ?? String(e);
     }
     nextTime += stepDur;
     step++;
