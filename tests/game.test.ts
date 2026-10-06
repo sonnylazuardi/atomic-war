@@ -697,3 +697,18 @@ describe('full game', () => {
     expect(s.players.some((p) => p.hp < p.maxHp)).toBe(true);
   });
 });
+
+describe('cheat', () => {
+  test('cheatShop: DK in hero slots 1-2, BKB + Aghanim in item slots 1-2, rest kept, 12 coins', () => {
+    const s0 = prepGame(9, 'axe_lord');
+    const before = structuredClone(s0.players[0]!.shop);
+    const s = G.cheatShop(s0, 0);
+    const p = s.players[0]!;
+    expect(p.shop.heroOffers.slice(0, 2)).toEqual(['dragon_knight', 'dragon_knight']);
+    expect(p.shop.heroOffers.slice(2)).toEqual(before.heroOffers.slice(2));
+    expect(p.shop.itemOffers.slice(0, 2)).toEqual(['black_king_bar', 'aghanims_scepter']);
+    expect(p.shop.itemOffers.slice(2)).toEqual(before.itemOffers.slice(2));
+    expect(p.shop.spellOffers).toEqual(before.spellOffers);
+    expect(p.coins).toBe(12);
+  });
+});

@@ -21,7 +21,7 @@ import { HERO_IDS, HERO_KITS, ITEM_IDS, LORD_SPELL_IDS, SPELL_IDS } from '../ids
 import type { Rng } from '../rng.ts';
 import type { GameState, HeroId, ItemId, OwnedHero, PlayerState, SpellId, Stars } from '../types.ts';
 import { addLevels, refreshCostFor, spellCostFor } from './lords.ts';
-import { log, say, benchCount, boardCount, fail, firstFreeSlot, heroName, pure, withRng, type GS } from './util.ts';
+import { say, benchCount, boardCount, fail, firstFreeSlot, heroName, pure, withRng, type GS } from './util.ts';
 
 export function itemCost(id: ItemId): number {
   return ITEMS[id]?.cost ?? 3;
@@ -270,18 +270,24 @@ export const buySpell = pure(buySpellM);
 export const buyItem = pure(buyItemM);
 export const refreshShop = pure(refreshShopM);
 
-/** Single-player cheat (triple-tap the "Mystery Shop" title): the hero row becomes 2x Dragon Knight and the
- *  item row Black King Bar + Aghanim's Scepter; other slots in those rows are emptied, spells untouched.
- *  Works offline and online (the server applies it to the sender's own seat, prep phase only). */
+/** Cheat (triple-tap the "Mystery Shop" title): hero slots 1-2 become Dragon Knight, item slots 1-2 become
+ *  Black King Bar and Aghanim's Scepter (rows are extended if shorter); every other offer is kept as it was;
+ *  coins are set to 12. Works offline and online (the server applies it to the sender's own seat, prep only). */
 export function cheatShopM(s: GS, pid: number) {
   const p = s.players[pid];
   if (!p || s.phase !== 'prep') return;
-  p.shop.heroOffers = p.shop.heroOffers.map((_, i) => (i < 2 ? 'dragon_knight' : null));
-  if (p.shop.heroOffers.length < 2) p.shop.heroOffers = ['dragon_knight', 'dragon_knight'];
-  const items: (ItemId | null)[] = ['black_king_bar', 'aghanims_scepter'];
-  p.shop.itemOffers = p.shop.itemOffers.map((_, i) => items[i] ?? null);
-  while (p.shop.itemOffers.length < 2) p.shop.itemOffers.push(items[p.shop.itemOffers.length]!);
-  if (p.isHuman) log(s, 'Cheat activated: 2x Dragon Knight, Black King Bar, Aghanim\'s Scepter.');
+  const heroes = [...p.shop.heroOffers];
+  while (heroes.length < 2) heroes.push(null);
+  heroes[0] = 'dragon_knight';
+  heroes[1] = 'dragon_knight';
+  const items = [...p.shop.itemOffers];
+  while (items.length < 2) items.push(null);
+  items[0] = 'black_king_bar';
+  items[1] = 'aghanims_scepter';
+  p.shop.heroOffers = heroes;
+  p.shop.itemOffers = items;
+  p.coins = 12;
+  if (p.isHuman) say(s, p, "Cheat activated: 2x Dragon Knight, Black King Bar, Aghanim's Scepter, 12 coins.");
 }
 export const cheatShop = pure(cheatShopM);
 export const upgradeShop = pure(upgradeShopM);
