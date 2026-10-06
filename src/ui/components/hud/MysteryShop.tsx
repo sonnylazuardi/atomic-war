@@ -16,8 +16,21 @@ const COLS = 5;
 const SPREAD: Record<number, number[]> = { 1: [3], 2: [2, 4], 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5] };
 const colOf = (i: number, n: number): CSSProperties => ({ gridColumn: (SPREAD[n] ?? [])[i] ?? (i % COLS) + 1 });
 
-export function MysteryShop({ onClose, mobile = false }: { onClose: () => void; mobile?: boolean }) {
-  const g = useGame();
+export function MysteryShop({
+  onClose,
+  mobile = false,
+  readOnly = false,
+}: {
+  onClose: () => void;
+  mobile?: boolean;
+  /** outside preparation: browse the offers to plan, but buying / refresh / lock are disabled */
+  readOnly?: boolean;
+}) {
+  const live = useGame();
+  // read-only: every action is a no-op so cards can't buy outside preparation
+  const g = readOnly
+    ? { ...live, buyHero: () => {}, buyItem: () => {}, buySpell: () => {}, refreshShop: () => {}, toggleLock: () => {} }
+    : live;
   const me = meOf(g);
   const spellCost = safe(() => spellCostFor(me), 3);
   const refresh = safe(() => refreshCostFor(me), 1);
@@ -120,6 +133,7 @@ export function MysteryShop({ onClose, mobile = false }: { onClose: () => void; 
       <button
         className="my-side-btn"
         data-testid="refresh-shop"
+        disabled={readOnly}
         onClick={() => g.refreshShop()}
         {...tip(() => (
           <div className="tip-body">
@@ -133,6 +147,7 @@ export function MysteryShop({ onClose, mobile = false }: { onClose: () => void; 
       <button
         className={`my-side-btn ${me.shop.locked ? 'on' : ''}`}
         data-testid="lock-shop"
+        disabled={readOnly}
         aria-pressed={me.shop.locked}
         onClick={() => g.toggleLock()}
         {...tip(() => (
@@ -149,7 +164,7 @@ export function MysteryShop({ onClose, mobile = false }: { onClose: () => void; 
 
   if (mobile) {
     return (
-      <div className="msheet" role="dialog" aria-label="Mystery shop">
+      <div className={`msheet${readOnly ? ' my-readonly' : ''}`} role="dialog" aria-label="Mystery shop">
         <div className="msheet-head">
           <span className="msheet-title">
             Mystery Shop <Stars n={me.shopLevel} />
@@ -167,14 +182,19 @@ export function MysteryShop({ onClose, mobile = false }: { onClose: () => void; 
           <div className="msheet-grid">{itemCells}</div>
           <h4 className="msheet-sub">Spells</h4>
           <div className="msheet-grid">{spellCells}</div>
-          <p className="msheet-hint">Tap to buy · press and hold for details</p>
+          <p className="msheet-hint">{readOnly ? 'Preview — buying opens in preparation' : 'Tap to buy · press and hold for details'}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mystery" role="dialog" aria-label="Mystery shop" onMouseDown={(e) => e.stopPropagation()}>
+    <div className={`mystery${readOnly ? ' my-readonly' : ''}`} role="dialog" aria-label="Mystery shop" onMouseDown={(e) => e.stopPropagation()}>
+      {readOnly && (
+        <div className="my-preview" data-testid="shop-preview">
+          Preview — plan your next buys · buying opens in preparation
+        </div>
+      )}
       <div className="my-grid">
         {heroCells}
         {itemCells}

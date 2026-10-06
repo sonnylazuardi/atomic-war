@@ -3008,3 +3008,23 @@ html[data-perf='saver'] .cx-head {
 html[data-perf='saver'] .conn-badge .ol-dot {
   animation: none;
 }
+
+/* Mystery shop opened outside preparation: browse to plan, but nothing is buyable */
+.my-readonly .my-cell { cursor: default; }
+.my-readonly .my-cell:hover .my-figure .portrait { transform: none; }
+.my-readonly .my-price b { opacity: 0.55; }
+.my-readonly .my-side-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.my-preview {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: #f3e1b0;
+  background: rgba(20, 17, 31, 0.92);
+  border: 1px solid rgba(201, 164, 92, 0.6);
+  pointer-events: none;
+}

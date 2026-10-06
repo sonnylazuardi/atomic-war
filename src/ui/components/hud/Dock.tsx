@@ -114,7 +114,6 @@ export function Dock({ shopOpen, onToggleShop }: { shopOpen: boolean; onToggleSh
         k="Space"
         label="Mystery"
         testid="open-shop"
-        disabled={!prep}
         active={shopOpen}
         badge={`⟳$${refresh}`}
         onClick={onToggleShop}
@@ -122,6 +121,7 @@ export function Dock({ shopOpen, onToggleShop }: { shopOpen: boolean; onToggleSh
           <div className="tip-body">
             <div className="tip-title">Mystery Shop</div>
             <p>Heroes, items and spells. Space toggles · R refreshes · Esc closes.</p>
+            {!prep && <p className="tip-note">Open it anytime to plan — buying opens in preparation.</p>}
           </div>
         )}
       >

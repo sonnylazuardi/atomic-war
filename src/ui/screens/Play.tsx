@@ -201,7 +201,14 @@ export function Play() {
       const s = useGame.getState();
       const isSpace = e.code === 'Space' || e.key === ' ';
       if (s.phase !== 'prep') {
-        if (isSpace) e.preventDefault();
+        // outside preparation the Mystery shop can still be opened to plan (read-only preview)
+        if (isSpace) {
+          e.preventDefault();
+          if (!e.repeat) {
+            hideTip();
+            setShopOpen((o) => !o);
+          }
+        } else if (e.key === 'Escape' && shopRef.current) setShopOpen(false);
         return;
       }
       if (e.repeat && (isSpace || e.code === 'KeyF' || e.code === 'KeyV')) {
@@ -287,7 +294,7 @@ export function Play() {
           {!spectating && <InventoryGrid />}
         </div>
         {canShop && <SellZone />}
-        {canShop && prep && shopOpen && <MysteryShop mobile onClose={() => setShopOpen(false)} />}
+        {canShop && shopOpen && <MysteryShop mobile readOnly={!prep} onClose={() => setShopOpen(false)} />}
         <SpectateBar />
         {phase === 'results' && <ResultToast left={timer} />}
         {phase === 'game_over' && <GameOver />}
@@ -313,7 +320,7 @@ export function Play() {
           </div>
         )}
         {canShop && <SellZone />}
-        {canShop && prep && shopOpen && <MysteryShop onClose={() => setShopOpen(false)} />}
+        {canShop && shopOpen && <MysteryShop readOnly={!prep} onClose={() => setShopOpen(false)} />}
         <SpectateBar />
         {phase === 'results' && <ResultToast left={timer} />}
         {lordTargeting && prep && <div className="hud-banner">Choose a hero for your lord ability · Esc cancels</div>}
