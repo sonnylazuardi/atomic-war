@@ -63,8 +63,9 @@ Sources: Steam Workshop page (id 3038795544), the "How to Play Atomic War" tutor
     leap to the backline at battle start; others: nearest). Mana starts at 50% of max and gains on
     attack / being hit (auto-battler convention) so ultimates actually fire.
 11. **Round timeout?** 45 sim seconds; then both sides take damage as a draw (half damage).
-12. **Player damage on loss?** `2 + round + sum(surviving enemy star value)` where star value =
-    1 + floor(level/10). Player HP 100 (Pudge lord 150).
+12. **Player damage on loss?** Summoners have 400 HP (Pudge lord 600), like the real game. Loss damage =
+    `8 + 4×round + Σ(2 + floor(level/4))` over surviving enemy heroes (draw: half each) — ~15 in round 1,
+    ~60 in round 10, ~110-130 in round 20; bot games last ~19 rounds, first knockout ~round 11.
 13. **Pairing?** Each round shuffle alive players into pairs; odd one fights a "ghost" copy of a
     random other alive player (ghost loss does not damage the ghost's owner).
 14. **Which battle does the human see?** Their own, animated, speed 1x/2x/4x + skip. Others resolve

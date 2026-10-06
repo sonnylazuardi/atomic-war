@@ -18,7 +18,7 @@ export const LORDS: Record<LordId, LordDef> = {
     title: 'Flesh Heap',
     glyph: '🍖',
     color: '#7a9a3a',
-    description: 'Your maximum and starting HP is 150 instead of 100.',
+    description: 'Flesh Heap: your summoner starts with 600 HP instead of the standard 400 — survive more lost rounds, great for slow-building late-game boards.',
     kind: 'passive',
   },
   bounty_hunter: {

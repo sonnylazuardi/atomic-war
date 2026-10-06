@@ -22,7 +22,7 @@ export const FORGES_FOR_DIVINE = 18;
 export const FORGE_COST = 1;
 export const OMNI_LEVELS = 12;
 export const OMNI_COST = 1;
-export const PUDGE_LORD_HP = 150;
+export const PUDGE_LORD_HP = 600; // Flesh Heap: 600 instead of the standard 400
 /** Bounty Hunter: +1 coin stored at the start of every prep from round 2 (= per completed round) */
 export const BOUNTY_PER_ROUND = 1;
 /** Bloodseeker's Bloodrage: pay 40 summoner HP; win the next battle -> +100 HP (capped at max HP) and +50 damage to the loser */

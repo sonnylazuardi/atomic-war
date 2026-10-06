@@ -93,8 +93,8 @@ describe('newGame', () => {
   test('pick lord -> prep', () => {
     const s = prepGame(5, 'pudge_lord');
     expect(s.phase).toBe('prep');
-    expect(s.players[0]!.maxHp).toBe(150);
-    expect(s.players[0]!.hp).toBe(150);
+    expect(s.players[0]!.maxHp).toBe(600);
+    expect(s.players[0]!.hp).toBe(600);
   });
 });
 

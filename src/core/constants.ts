@@ -1,7 +1,7 @@
 // Game tuning knobs. Single source of truth for economy and arena geometry.
 
 export const PLAYER_COUNT = 8;
-export const PLAYER_START_HP = 100;
+export const PLAYER_START_HP = 400; // real Atomic War: summoners start with 400 HP (Pudge lord 600)
 
 export const ARENA_W = 1000;
 export const ARENA_H = 600;
@@ -72,9 +72,11 @@ export const maxItemTier = (shopLevel: number) => {
 /** Skills tab of the hero roster: 5 slots from level 1 (slot 0 = signature, fixed) */
 export const SPELL_SLOTS = 5;
 export const spellSlotsForLevel = (_level: number) => SPELL_SLOTS;
-/** damage the loser takes */
+/** Summoner HP the loser takes (draw: half each). Scaled for 400 HP summoners: grows with the round and
+ *  with every enemy hero still standing (stronger heroes hurt more). ~15 in round 1, ~60 in round 10,
+ *  ~130 in round 20 — matches last ~18 rounds like before the 100 -> 400 HP change. */
 export const lossDamage = (round: number, survivorLevels: number[]) =>
-  2 + round + survivorLevels.reduce((s, l) => s + 1 + Math.floor(l / 10), 0);
+  8 + 4 * round + survivorLevels.reduce((s, l) => s + 2 + Math.floor(l / 4), 0);
 
 /** board slot -> arena spawn position (feet). Top-down camera like the real game: team 'left' (the
  *  host / the human in the World view) stands on the BOTTOM half facing up, team 'right' on the TOP half.
