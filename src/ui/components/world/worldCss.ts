@@ -1,7 +1,12 @@
 // Scoped styles for <World/> (banners + floating battle controls). Injected once by World.
 export const WORLD_CSS = `
 .aw-world{position:relative;width:100%;height:100%;min-height:0;overflow:hidden;background:#0b0c10;user-select:none;-webkit-user-select:none;font-family:system-ui,'Segoe UI',sans-serif;color:#e8ecf3;touch-action:manipulation;container-type:inline-size;container-name:awworld}
+.aw-world-stage{position:absolute;inset:0;will-change:transform}
+.aw-world-ground{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
 .aw-world-svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* dynamic layers get their own compositor layers so moving units never repaint the terrain */
+.aw-world-live,.aw-world-amb{will-change:transform;contain:strict}
+.aw-world-amb{pointer-events:none}
 .aw-world-svg .aw-hero-hit{cursor:grab;touch-action:none}
 /* SVG children ignore touch-action in Chrome: the whole svg opts out of panning while heroes are draggable */
 .aw-world.prep .aw-world-svg{touch-action:none}

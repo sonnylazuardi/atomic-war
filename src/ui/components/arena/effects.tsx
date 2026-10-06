@@ -201,13 +201,13 @@ function Pop({ e, now, k: sc = 1 }: { e: Extract<Effect, { kind: 'pop' }>; now: 
   );
 }
 
-function Burst({ e, now }: { e: Extract<Effect, { kind: 'burst' }>; now: number }) {
+function Burst({ e, now, lite }: { e: Extract<Effect, { kind: 'burst' }>; now: number; lite?: boolean }) {
   const k = clamp01((now - e.start) / e.dur);
   return (
     <g transform={`translate(${e.x},${e.y})`} opacity={1 - k}>
       <circle r={e.r * easeOut(k)} fill="none" stroke={e.color} strokeWidth={4 * (1 - k) + 0.5} />
-      {Array.from({ length: 6 }, (_, i) => {
-        const a = (i / 6) * Math.PI * 2 + 0.3;
+      {Array.from({ length: lite ? 3 : 6 }, (_, i) => {
+        const a = (i / (lite ? 3 : 6)) * Math.PI * 2 + 0.3;
         const r0 = e.r * 0.3 + e.r * 0.7 * easeOut(k);
         return <circle key={i} cx={Math.cos(a) * r0} cy={Math.sin(a) * r0 * 0.7} r={2.4 * (1 - k) + 0.4} fill={e.color} />;
       })}
@@ -215,11 +215,11 @@ function Burst({ e, now }: { e: Extract<Effect, { kind: 'burst' }>; now: number 
   );
 }
 
-function Dust({ e, now }: { e: Extract<Effect, { kind: 'dust' }>; now: number }) {
+function Dust({ e, now, lite }: { e: Extract<Effect, { kind: 'dust' }>; now: number; lite?: boolean }) {
   const k = clamp01((now - e.start) / e.dur);
   return (
     <g transform={`translate(${e.x},${e.y})`} opacity={(1 - k) * 0.7}>
-      {[-1, -0.4, 0.4, 1].map((d, i) => (
+      {(lite ? [-0.7, 0.7] : [-1, -0.4, 0.4, 1]).map((d, i) => (
         <circle key={i} cx={d * 24 * easeOut(k)} cy={-4 - k * 10 - (i % 2) * 4} r={6 + k * 8} fill="#8b8172" />
       ))}
     </g>
@@ -229,17 +229,34 @@ function Dust({ e, now }: { e: Extract<Effect, { kind: 'dust' }>; now: number })
 function VfxEffect({ e, now }: { e: Extract<Effect, { kind: 'vfx' }>; now: number }) {
   const Art = getVfx(e.spellId);
   const t = now - e.start;
+  // art contract: t in [0, duration] — some art draws negative radii past its end
+  if (t < 0 || t > e.dur) return null;
   return <Art t={t} duration={e.dur} from={e.from} to={e.to} radius={e.radius} team={e.team} color={e.color} />;
 }
 
-/** spell VFX + bursts (under floating text) */
-export function VfxLayer({ effects, now }: { effects: Effect[]; now: number }) {
+/** max spell VFX drawn at once in the lite (saver) profile — newest win */
+const LITE_MAX_VFX = 4;
+
+/** spell VFX + bursts (under floating text). `lite`: fewer particles, at most LITE_MAX_VFX spell VFX. */
+export function VfxLayer({ effects, now, lite = false }: { effects: Effect[]; now: number; lite?: boolean }) {
+  let skipVfx = 0;
+  if (lite) {
+    let n = 0;
+    for (const e of effects) if (e.kind === 'vfx' && now >= e.start) n++;
+    skipVfx = Math.max(0, n - LITE_MAX_VFX);
+  }
   return (
     <g>
       {effects.map((e) => {
-        if (e.kind === 'vfx') return <VfxEffect key={e.id} e={e} now={now} />;
-        if (e.kind === 'burst') return <Burst key={e.id} e={e} now={now} />;
-        if (e.kind === 'dust') return <Dust key={e.id} e={e} now={now} />;
+        if (e.kind === 'vfx') {
+          if (skipVfx > 0 && now >= e.start) {
+            skipVfx--;
+            return null;
+          }
+          return <VfxEffect key={e.id} e={e} now={now} />;
+        }
+        if (e.kind === 'burst') return <Burst key={e.id} e={e} now={now} lite={lite} />;
+        if (e.kind === 'dust') return <Dust key={e.id} e={e} now={now} lite={lite} />;
         return null;
       })}
     </g>
@@ -260,12 +277,12 @@ export function TextLayer({ effects, now, scale = 1 }: { effects: Effect[]; now:
 }
 
 /** drop expired effects and cap the number of floating texts (oldest go first) */
-export function pruneEffects(effects: Effect[], now: number): Effect[] {
+export function pruneEffects(effects: Effect[], now: number, maxTexts = MAX_TEXTS): Effect[] {
   const alive = effects.filter((e) => now - e.start <= e.dur + 0.05);
   let texts = 0;
   for (const e of alive) if (e.kind === 'text') texts++;
-  if (texts <= MAX_TEXTS) return alive;
-  let drop = texts - MAX_TEXTS;
+  if (texts <= maxTexts) return alive;
+  let drop = texts - maxTexts;
   return alive.filter((e) => {
     if (drop > 0 && e.kind === 'text' && !e.big) {
       drop--;

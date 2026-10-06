@@ -3,6 +3,7 @@ import { boardCount } from '../../../core/game/index.ts';
 import { useMe } from '../../me.ts';
 import { ReadyButton } from './ReadyButton.tsx';
 import { useGame } from '../../store.ts';
+import { AudioButton } from '../../../audio/AudioButton.tsx';
 
 export function TopCenter({ timer, enemy }: { timer: number | null; enemy: string | null }) {
   const round = useGame((s) => s.round);
@@ -45,6 +46,7 @@ export function TopCenter({ timer, enemy }: { timer: number | null; enemy: strin
         <span className="ht-coin">$</span>
         <b data-testid="coins">{me.coins}</b>
       </div>
+      <AudioButton />
     </div>
   );
 }

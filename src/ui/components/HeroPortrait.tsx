@@ -36,7 +36,7 @@ interface Props {
 }
 
 function HeroPortraitImpl({ heroId, team = 'left', showcase = false, phase = 0, className }: Props) {
-  const t = useClock() + phase;
+  const t = useClock('portrait') + phase;
   const Art = getHeroArt(heroId);
   const { anim, at, dur } = pickAnim(t, showcase);
   return (

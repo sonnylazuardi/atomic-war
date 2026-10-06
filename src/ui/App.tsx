@@ -15,6 +15,7 @@ import { Title } from './screens/online/Title.tsx';
 import { WaitingRoom } from './screens/online/WaitingRoom.tsx';
 import { Codex } from './screens/codex/Codex.tsx';
 import { useRoute } from './screens/codex/route.ts';
+import { initAudioWiring } from '../audio/wire.ts';
 
 /** Logical stage sizes: desktop 1366x768; landscape phones get a smaller stage so the HUD is less tiny. */
 const STAGES = { desktop: [1366, 768], compact: [1100, 620] } as const;
@@ -108,6 +109,7 @@ function Lobby({ children }: { children: ReactNode }) {
 
 export function App() {
   useEffect(bootOnline, []);
+  useEffect(initAudioWiring, []);
   const mode = useMode((s) => s.mode);
   const codex = useRoute((s) => s.codex);
   const gallery = new URLSearchParams(location.search).has('gallery');

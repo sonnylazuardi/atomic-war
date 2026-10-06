@@ -18,11 +18,14 @@ import { TextLayer, VfxLayer, pruneEffects } from './arena/effects.tsx';
 import { toDisplay } from './world/mirror.ts';
 import { advance, currentShake, jumpToEnd, makePlayback } from './world/battlePlayback.ts';
 import type { Playback } from './world/battlePlayback.ts';
-import { TerrainAmbient, TerrainGround, setTerrain } from './world/terrainLayers.tsx';
+import { TerrainAmbient, fadeK, setTerrain } from './world/terrainLayers.tsx';
+import { GroundStack } from './world/groundRaster.tsx';
+import { makeFrameGate, usePerf } from '../perf.ts';
 import type { TerrainFade } from './world/terrainLayers.tsx';
 import { FormationTiles, sameSlot, slotAt, slotPos } from './world/FormationTiles.tsx';
 import { WORLD_CSS } from './world/worldCss.ts';
 import { BeaconBack, BeaconFront, LevelUpBurst, UpgradeDefs } from './world/upgradeFx.tsx';
+import { battleEvents, sfx } from '../../audio/sfx.ts';
 
 export interface WorldProps {
   /** prep: human's own arena, own board heroes idle at their slots. battle: teleport-in, playback, teleport-home. */
@@ -330,6 +333,7 @@ function startRun(ws: WS, battle: BattleResult | null, humanSide: Team): Run {
     });
     run.introLen = Math.max(1.4, last + 0.45);
     run.switchIn = 0;
+    if (theirs.length) sfx.teleport(0.3);
   } else {
     // visitor: human heroes teleport out of home, terrain swaps, they arrive in the host's arena
     mine.forEach((u, i) => {
@@ -346,6 +350,8 @@ function startRun(ws: WS, battle: BattleResult | null, humanSide: Team): Run {
       last = Math.max(last, at + TP_SHOW);
     });
     run.introLen = Math.max(1.8, last + 0.45);
+    sfx.teleport(0.05);
+    sfx.teleport(1.05);
   }
   return run;
 }
@@ -387,6 +393,7 @@ function startOutro(ws: WS, run: Run, actorsCount: number) {
       run.vanish.set(u.uid, now + 0.75);
     }
   }
+  if (units.some((u) => u.alive)) sfx.teleport(0.6);
   run.outroHome = run.visiting ? now + gone : Infinity;
   run.outroReturn = now + gone + (run.visiting ? 0.3 : 0.05);
   run.outroEnd = run.outroReturn + Math.min(actorsCount, 8) * 0.08 + 0.7;
@@ -394,6 +401,7 @@ function startOutro(ws: WS, run: Run, actorsCount: number) {
 
 function returnHome(ws: WS, run: Run) {
   run.returned = true;
+  if (ws.actors.size) sfx.teleport(0);
   const actors = [...ws.actors.values()].sort((a, b) => a.y - b.y);
   actors.forEach((a, i) => {
     a.x = a.fromX = a.toX;
@@ -451,12 +459,62 @@ export function World(props: WorldProps) {
   }
   const ws = wsRef.current;
 
+  const perf = usePerf();
+  const perfRef = useRef(perf);
+  perfRef.current = perf;
+  const wakeRef = useRef<() => void>(() => {});
+
   useEffect(() => {
     let raf = 0;
+    let sleeping = false;
     let last = clockNow();
+    const fpsNow = () => {
+      const pr = perfRef.current;
+      return ws.run && ws.run.phase !== 'done' ? pr.battleFps : pr.idleFps;
+    };
+    const gate = makeFrameGate(fpsNow);
+    /** nothing animates: saver tier lets the loop sleep until props / input change */
+    const quiet = () => {
+      const now = ws.now;
+      if (ws.run && ws.run.phase !== 'done') return false;
+      if (ws.drag || ws.floorDown || now - ws.dnd.at < 0.3) return false;
+      if (ws.tps.length) return false;
+      if (now - ws.prepSince < 0.5) return false;
+      if (ws.terrain.prev || fadeK(ws.terrain, now) < 1) return false;
+      for (const a of ws.actors.values()) {
+        if (a.moveDur > 0 || now - a.levelUpAt < 1.1) return false;
+        if (a.visibleFrom > 0 && now - a.visibleFrom < FADE + 0.05) return false;
+      }
+      return true;
+    };
+    const frame = (ts: number) => {
+      raf = 0;
+      if (document.hidden) {
+        sleeping = true;
+        return;
+      }
+      if (gate(ts)) {
+        tick();
+        if (perfRef.current.tier === 'saver' && quiet()) {
+          sleeping = true;
+          return;
+        }
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    const wake = () => {
+      if (!sleeping || raf || document.hidden) return;
+      sleeping = false;
+      raf = requestAnimationFrame(frame);
+    };
+    wakeRef.current = wake;
+    const onVis = () => {
+      if (!document.hidden) wake();
+    };
+    document.addEventListener('visibilitychange', onVis);
     const tick = () => {
       const now = clockNow();
-      const realDt = Math.min(0.1, Math.max(0, now - last));
+      const realDt = Math.min(0.25, Math.max(0, now - last));
       last = now;
       ws.now = now;
       const p = propsRef.current;
@@ -501,10 +559,12 @@ export function World(props: WorldProps) {
             dtB = realDt * run.speed;
             pb.t = Math.min(pb.end, pb.t + dtB);
           }
-          advance(pb, dtB);
+          pb.maxTexts = perfRef.current.richVfx ? 36 : 12;
+          const crossed = advance(pb, dtB);
+          if (crossed.length) battleEvents(crossed, run.speed);
           if (pb.t >= pb.end) startOutro(ws, run, ws.actors.size);
         } else if (run.phase === 'outro') {
-          pb.effects = pruneEffects(pb.effects, pb.t + (now - run.phaseStart));
+          pb.effects = pruneEffects(pb.effects, pb.t + (now - run.phaseStart), pb.maxTexts);
           if (!run.returned && now >= run.outroReturn) returnHome(ws, run);
           if (now >= run.outroEnd) run.phase = 'done';
         }
@@ -528,11 +588,18 @@ export function World(props: WorldProps) {
       if (ws.tps.length) ws.tps = ws.tps.filter((t) => now - t.start <= TP_DUR);
 
       setTick((n) => (n + 1) & 0xffff);
-      raf = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener('visibilitychange', onVis);
+      wakeRef.current = () => {};
+    };
   }, [ws]);
+  // any render (props / resize / perf change) may need frames again
+  useEffect(() => {
+    wakeRef.current();
+  });
 
   // ---------------------------------------------------------------- input
   const toArena = (clientX: number, clientY: number) => {
@@ -543,6 +610,8 @@ export function World(props: WorldProps) {
     return { x: pt.x, y: pt.y };
   };
   const prepActive = mode === 'prep' && !ws.run;
+  const lite = !perf.richVfx;
+  const wakeNow = () => wakeRef.current();
 
   const onHeroDown = (uid: string, e: RPointerEvent) => {
     if (!prepActive || e.button !== 0) return;
@@ -729,11 +798,24 @@ export function World(props: WorldProps) {
   };
 
   return (
-    <div ref={rootRef} className={`aw-world${dragging ? ' dragging' : ''}${prepActive ? ' prep' : ''}`} data-testid="world" data-mode={mode} data-phase={run ? run.phase : 'prep'}>
+    <div
+      ref={rootRef}
+      className={`aw-world${dragging ? ' dragging' : ''}${prepActive ? ' prep' : ''}`}
+      data-testid="world"
+      data-mode={mode}
+      data-phase={run ? run.phase : 'prep'}
+      onPointerDownCapture={wakeNow}
+      onPointerMoveCapture={wakeNow}
+      onPointerUpCapture={wakeNow}
+      onDragOverCapture={wakeNow}
+    >
       <style>{WORLD_CSS}</style>
+      <div className="aw-world-stage" style={shake ? { transform: `translate(${(sx * pxScale).toFixed(1)}px,${(sy * pxScale).toFixed(1)}px)` } : undefined}>
+      {/* static terrain: cached raster under the live layers */}
+      <GroundStack f={ws.terrain} now={now} map={{ vb, fit, w: box.w, h: box.h }} dprCap={perf.tier === 'saver' ? 2 : 3} />
       <svg
         ref={svgRef}
-        className="aw-world-svg"
+        className="aw-world-svg aw-world-live"
         viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
         preserveAspectRatio={`xMidYMid ${fit}`}
         onPointerDown={onSvgDown}
@@ -745,13 +827,14 @@ export function World(props: WorldProps) {
         }}
       >
         <defs>
-          <filter id="aw-desat">
-            <feColorMatrix type="saturate" values="0.15" />
-          </filter>
+          {!lite && (
+            <filter id="aw-desat">
+              <feColorMatrix type="saturate" values="0.15" />
+            </filter>
+          )}
           <UpgradeDefs />
         </defs>
-        <g transform={shake ? `translate(${sx.toFixed(2)},${sy.toFixed(2)})` : undefined}>
-          <TerrainGround f={ws.terrain} now={now} />
+        <g>
           <FormationTiles
             opacity={tilesOpacity}
             active={dragging || dndLive}
@@ -771,7 +854,7 @@ export function World(props: WorldProps) {
           <g>
             {battleUnits.map(({ u, alpha }) => (
               <g key={u.uid} opacity={alpha < 1 ? alpha : undefined}>
-                <UnitView u={u} fx={pb?.fx.get(u.uid)} human={u.team === 'left'} battleT={pb?.t ?? now} />
+                <UnitView u={u} fx={pb?.fx.get(u.uid)} human={u.team === 'left'} battleT={pb?.t ?? now} lite={lite} />
               </g>
             ))}
             {actors.map((a) => (
@@ -802,9 +885,8 @@ export function World(props: WorldProps) {
               })}
             </g>
           )}
-          {pb && run && run.phase !== 'intro' && <VfxLayer effects={pb.effects} now={fxNow} />}
+          {pb && run && run.phase !== 'intro' && <VfxLayer effects={pb.effects} now={fxNow} lite={lite} />}
           {pb && run && run.phase !== 'intro' && <TextLayer effects={pb.effects} now={fxNow} scale={textScale} />}
-          <TerrainAmbient f={ws.terrain} now={now} />
           <g pointerEvents="none">
             {ws.tps.map((t) => {
               const k = now - t.start;
@@ -819,6 +901,12 @@ export function World(props: WorldProps) {
           </g>
         </g>
       </svg>
+      {perf.ambient && (
+        <svg className="aw-world-svg aw-world-amb" viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} preserveAspectRatio={`xMidYMid ${fit}`} aria-hidden="true">
+          <TerrainAmbient f={ws.terrain} now={now} />
+        </svg>
+      )}
+      </div>
 
       {banner}
 

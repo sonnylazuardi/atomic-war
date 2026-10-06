@@ -170,7 +170,8 @@ function StatusIcon({ s, x }: { s: StatusKind; x: number }) {
 
 const ICON_STATUSES: StatusKind[] = ['silenced', 'rooted', 'slowed', 'blinded', 'hexed', 'grave', 'burning', 'buffed', 'invulnerable'];
 
-export function UnitView({ u, fx, human, battleT }: { u: UnitSnapshot; fx: BarFx | undefined; human: boolean; battleT: number }) {
+/** `lite` (saver perf tier): no SVG filters, fewer layered glows */
+export function UnitView({ u, fx, human, battleT, lite = false }: { u: UnitSnapshot; fx: BarFx | undefined; human: boolean; battleT: number; lite?: boolean }) {
   const Art = getHeroArt(u.heroId);
   const team = TEAM_COLORS[u.team];
   const st = new Set(u.statuses);
@@ -200,7 +201,7 @@ export function UnitView({ u, fx, human, battleT }: { u: UnitSnapshot; fx: BarFx
       )}
       {st.has('rooted') && u.alive && <Vines t={battleT} />}
       <g transform={sway ? `rotate(${sway.toFixed(2)})` : undefined} opacity={artOpacity}>
-        <g transform={u.facing === -1 ? 'scale(-1,1)' : undefined} filter={u.alive ? undefined : 'url(#aw-desat)'}>
+        <g transform={u.facing === -1 ? 'scale(-1,1)' : undefined} filter={u.alive || lite ? undefined : 'url(#aw-desat)'}>
           {hexed ? <Sheep t={battleT} /> : <Art anim={asleep ? 'idle' : u.anim} t={asleep ? battleT * 0.4 : u.animT} dur={asleep ? 0 : u.animDur} team={u.team} />}
         </g>
       </g>
@@ -214,9 +215,9 @@ export function UnitView({ u, fx, human, battleT }: { u: UnitSnapshot; fx: BarFx
         <g pointerEvents="none">
           <ellipse cx={0} cy={-40} rx={36} ry={50} fill="#ffcf3f" opacity={0.16 + Math.sin(battleT * 5) * 0.04} />
           <ellipse cx={0} cy={-40} rx={36} ry={50} fill="none" stroke="#ffd95a" strokeWidth={2.6} opacity={0.7 + Math.sin(battleT * 8) * 0.2} />
-          <ellipse cx={0} cy={-40} rx={30} ry={44} fill="none" stroke="#fff3b8" strokeWidth={1} opacity={0.35} />
+          {!lite && <ellipse cx={0} cy={-40} rx={30} ry={44} fill="none" stroke="#fff3b8" strokeWidth={1} opacity={0.35} />}
           {/* shimmer band sweeping up the bubble */}
-          <ellipse cx={0} cy={-40 + 40 - ((battleT * 60) % 100)} rx={30} ry={5} fill="#fff6cf" opacity={0.28} />
+          {!lite && <ellipse cx={0} cy={-40 + 40 - ((battleT * 60) % 100)} rx={30} ry={5} fill="#fff6cf" opacity={0.28} />}
           <path d="M-22,-72 Q-6,-88 12,-83" stroke="#fff6cf" strokeWidth={2.4} fill="none" opacity={0.75} strokeLinecap="round" />
         </g>
       )}

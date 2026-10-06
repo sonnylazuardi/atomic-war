@@ -2916,3 +2916,95 @@ body {
     box-shadow: 0 0 12px rgba(255, 60, 70, 0.8);
   }
 }
+
+/* ============================================================ BATTERY SAVER (html[data-perf="saver"], see ui/perf.ts)
+   Phones heated up from paint/raster, not JS: no backdrop blur, no filters over the arena or on animated
+   things, no infinite animations (static highlight instead), and paint containment on HUD panels. */
+html[data-perf='saver'] .hud-top,
+html[data-perf='saver'] .hud-players .hp-row,
+html[data-perf='saver'] .hud-roster,
+html[data-perf='saver'] .hud-inv,
+html[data-perf='saver'] .hud-unit,
+html[data-perf='saver'] .mystery,
+html[data-perf='saver'] .result-toast {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: linear-gradient(180deg, rgba(24, 20, 14, 0.94), rgba(12, 10, 8, 0.94));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+html[data-perf='saver'] .hud-top,
+html[data-perf='saver'] .hud-roster,
+html[data-perf='saver'] .hud-inv,
+html[data-perf='saver'] .hud-unit,
+html[data-perf='saver'] .hud-players,
+html[data-perf='saver'] .hud-dock,
+html[data-perf='saver'] .mystery {
+  contain: layout paint;
+}
+html[data-perf='saver'] .go-overlay {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(6, 7, 10, 0.88);
+}
+html[data-perf='saver'] .ls-world,
+html[data-perf='saver'] .lord-glyph,
+html[data-perf='saver'] .dock-lord-glyph,
+html[data-perf='saver'] .my-hero.dup .my-figure .portrait,
+html[data-perf='saver'] .my-beam,
+html[data-perf='saver'] .sz-can svg {
+  filter: none;
+}
+html[data-perf='saver'] .ls-world {
+  opacity: 0.35;
+}
+/* infinite pulses / glows / beams -> static highlight */
+html[data-perf='saver'] .btn-upgrade,
+html[data-perf='saver'] .ht-emblem svg,
+html[data-perf='saver'] .ht-sub.urgent,
+html[data-perf='saver'] .hud-ready,
+html[data-perf='saver'] .rr-up,
+html[data-perf='saver'] .inv-cell.selected,
+html[data-perf='saver'] .my-hero.dup .my-figure::after,
+html[data-perf='saver'] .my-beam,
+html[data-perf='saver'] .my-beam::after,
+html[data-perf='saver'] .my-uplv,
+html[data-perf='saver'] .ht-timer.urgent,
+html[data-perf='saver'] .sz-arrow,
+html[data-perf='saver'] .key-wrap.lord-armed .key-btn {
+  animation: none;
+}
+html[data-perf='saver'] .btn-upgrade,
+html[data-perf='saver'] .rr-up,
+html[data-perf='saver'] .inv-cell.selected {
+  box-shadow: 0 0 0 1px var(--gold) inset;
+}
+html[data-perf='saver'] .my-hero.dup .my-figure::after {
+  opacity: 0.7;
+}
+html[data-perf='saver'] .ht-timer.urgent,
+html[data-perf='saver'] .ht-sub.urgent {
+  color: #ff8a8f;
+}
+html[data-perf='saver'] .key-wrap.lord-armed .key-btn {
+  box-shadow: 0 0 0 2px #ff4d5a inset;
+}
+/* online / lobby / lord select / codex (their CSS lives in *.css.ts strings) */
+html[data-perf='saver'] .ol-logo,
+html[data-perf='saver'] .cx-title,
+html[data-perf='saver'] .sm-timer {
+  filter: none;
+}
+/* the filter used to make the timer its own containing block + stacking context (its number is absolutely
+   positioned): `contain` keeps both without the raster cost; and a display-only timer never eats taps */
+html[data-perf='saver'] .sm-timer {
+  contain: layout paint;
+  pointer-events: none;
+}
+html[data-perf='saver'] .cx-head {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgba(13, 8, 20, 0.97);
+}
+html[data-perf='saver'] .conn-badge .ol-dot {
+  animation: none;
+}

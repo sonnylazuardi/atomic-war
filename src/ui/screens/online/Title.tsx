@@ -8,6 +8,7 @@ import { useClock } from '../../useClock.ts';
 import { LobbyShell } from './Shell.tsx';
 import { CODEX_PATH, openCodex } from '../codex/route.ts';
 import { promptInstall, useInstallState } from '../../pwa.ts';
+import { AudioButton } from '../../../audio/AudioButton.tsx';
 
 function Fig({ id, t, flip }: { id: LordId; t: number; flip?: boolean }) {
   const Art = getLordArt(id);
@@ -46,6 +47,7 @@ export function Title() {
   const b = LORD_IDS[Math.min(LORD_IDS.length - 1, 3)]!;
   return (
     <LobbyShell center testId="title">
+      <AudioButton floating />
       <div className="ol-hero-row">
         <Fig id={a} t={t} />
         <h1 className="ol-logo">

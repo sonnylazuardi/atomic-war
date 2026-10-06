@@ -8,6 +8,7 @@ import { lordDef, spellDef } from '../defs.ts';
 import type { DragPayload } from '../dnd.ts';
 import { lordStatus } from './lordStatus.ts';
 import { useUi } from '../uiState.ts';
+import { sfx } from '../../../audio/sfx.ts';
 
 export const me = () => meOf(useGame.getState());
 export const isPrep = () => useGame.getState().phase === 'prep';
@@ -64,6 +65,7 @@ export function clickHero(uid: string | null) {
   }
   if (g.phase === 'prep' && ui.lordTargeting) {
     g.useLordAbility(h.uid);
+    sfx.lordAbility();
     ui.setLordTargeting(false);
     ui.select(h.uid);
     return;
@@ -103,5 +105,8 @@ export function triggerLord() {
   if (ls.poor || ls.disabled) return;
   if (!safe(() => lordActiveAvailable(p), true)) return;
   if (l.needsTarget) ui.setLordTargeting(true);
-  else g.useLordAbility();
+  else {
+    g.useLordAbility();
+    sfx.lordAbility();
+  }
 }

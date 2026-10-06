@@ -6,6 +6,7 @@ import type { LordId } from '../../core/types.ts';
 import { lordDef } from '../components/defs.ts';
 import { useGame } from '../store.ts';
 import { useClock } from '../useClock.ts';
+import { usePerf } from '../perf.ts';
 import { LORD_SELECT_CSS } from './lordSelect.css.ts';
 
 const PICK_TIME = 30;
@@ -58,7 +59,8 @@ function Countdown({ left, total }: { left: number; total: number }) {
 
 export function LordSelect() {
   const g = useGame();
-  const t = useClock();
+  const t = useClock(); // 'scene': idleFps (12 in battery saver), also drives the offline countdown
+  const perf = usePerf();
   const choices = g.lordChoices ?? [];
   const choiceKey = choices.join(',');
   const [sel, setSel] = useState(0);
@@ -104,9 +106,11 @@ export function LordSelect() {
       <div className="sb-layer static">
         <SummonerBackdrop />
       </div>
-      <div className="sb-layer">
-        <SummonerAmbient t={t} />
-      </div>
+      {perf.ambient && (
+        <div className="sb-layer">
+          <SummonerAmbient t={t} />
+        </div>
+      )}
       <div className="sm-content">
         {timer || deadline != null ? <Countdown left={left} total={total} /> : null}
         <h1 className="sm-title">Choose Your Summoner</h1>

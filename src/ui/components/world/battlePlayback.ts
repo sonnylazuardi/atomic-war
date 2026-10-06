@@ -1,6 +1,6 @@
 // Mutable battle playback state (frames interpolation, events -> effects, HP bar chip fx, shake).
 // Lives in a ref; the World's RAF clock advances it — no per-entity React state.
-import type { BattleResult, UnitSnapshot, Vec } from '../../../core/types.ts';
+import type { BattleEvent, BattleResult, UnitSnapshot, Vec } from '../../../core/types.ts';
 import { EventCursor, FramePlayer } from '../arena/playback.ts';
 import type { Interp } from '../arena/playback.ts';
 import { effectsForEvent, pruneEffects } from '../arena/effects.tsx';
@@ -23,6 +23,8 @@ export interface Playback {
   idSeq: number;
   shakeAmp: number;
   shakeStart: number;
+  /** cap on simultaneous floating texts (lower in the saver perf tier) */
+  maxTexts: number;
 }
 
 export function makePlayback(battle: BattleResult): Playback {
@@ -40,6 +42,7 @@ export function makePlayback(battle: BattleResult): Playback {
     idSeq: 1,
     shakeAmp: 0,
     shakeStart: 0,
+    maxTexts: 36,
   };
 }
 
@@ -48,8 +51,8 @@ export function currentShake(pb: Playback) {
   return k > 0 ? pb.shakeAmp * k : 0;
 }
 
-/** advance derived state (events -> effects, bar fx) to pb.t */
-export function advance(pb: Playback, dtBattle: number) {
+/** advance derived state (events -> effects, bar fx) to pb.t; returns the events just crossed */
+export function advance(pb: Playback, dtBattle: number): BattleEvent[] {
   const view = pb.player.at(pb.t);
   pb.view = view;
   const byUid = new Map<string, UnitSnapshot>();
@@ -78,7 +81,7 @@ export function advance(pb: Playback, dtBattle: number) {
       }
     }
   }
-  pb.effects = pruneEffects(pb.effects, pb.t);
+  pb.effects = pruneEffects(pb.effects, pb.t, pb.maxTexts);
 
   for (const u of view.units) {
     let f = pb.fx.get(u.uid);
@@ -92,6 +95,7 @@ export function advance(pb: Playback, dtBattle: number) {
     if (f.chip < u.hp) f.chip = u.hp;
     f.prevHp = u.hp;
   }
+  return events;
 }
 
 /** jump straight to the end (skip): final frame, no effects spawned for skipped events */

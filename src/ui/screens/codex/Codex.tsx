@@ -506,7 +506,7 @@ function LordFigure({ id, t }: { id: LordId; t: number }) {
 }
 
 function LordsGrid() {
-  const t = useClock();
+  const t = useClock('portrait'); // 17 figures: static in battery saver
   return (
     <div className="cx-grid lords">
       {LORD_IDS.map((id, i) => {

@@ -2,6 +2,7 @@
 // terrains, every hero x anim state x team,
 // every attack projectile, every spell VFX / zone / projectile on loop.
 import { memo, useEffect, useMemo, useState } from 'react';
+import { useClock } from '../useClock.ts';
 import type { AnimState, BoardSlot, HeroDef, HeroId, OwnedHero, SpellId, Team, TerrainId } from '../../core/types.ts';
 import { HERO_IDS, SPELL_IDS } from '../../core/ids.ts';
 import { BOARD_COLS, BOARD_ROWS, LEVELS_PER_UPGRADE, TERRAIN_IDS } from '../../core/constants.ts';
@@ -53,21 +54,6 @@ const CSS = `
 .gal-terrains{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
 .gal-proj{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
 `;
-
-function useClock() {
-  const [t, setT] = useState(0);
-  useEffect(() => {
-    let raf = 0;
-    const t0 = performance.now();
-    const loop = (now: number) => {
-      setT((now - t0) / 1000);
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, []);
-  return t;
-}
 
 /** anim clock per state: one-shots play for 0.6s every 1.2s (idle between), dead replays every 2.5s */
 function animAt(anim: AnimState, t: number): { anim: AnimState; t: number; dur: number } {
