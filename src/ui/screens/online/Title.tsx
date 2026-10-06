@@ -7,6 +7,7 @@ import { useMode } from '../../mode.ts';
 import { useClock } from '../../useClock.ts';
 import { LobbyShell } from './Shell.tsx';
 import { CODEX_PATH, openCodex } from '../codex/route.ts';
+import { promptInstall, useInstallState } from '../../pwa.ts';
 
 function Fig({ id, t, flip }: { id: LordId; t: number; flip?: boolean }) {
   const Art = getLordArt(id);
@@ -74,6 +75,7 @@ export function Title() {
           <BookIcon />
           Gallery
         </a>
+        <InstallLink />
         {user && (
           <div className="ol-note" style={{ textAlign: 'center' }}>
             Signed in as <b>{user.name ?? user.email}</b>
@@ -83,4 +85,24 @@ export function Title() {
       </div>
     </LobbyShell>
   );
+}
+
+/** "Install app" (Chrome/Edge/Android) or an Add-to-Home-Screen hint (iOS Safari). Hidden once installed. */
+function InstallLink() {
+  const state = useInstallState();
+  if (state === 'prompt')
+    return (
+      <button type="button" className="ol-codex-link" data-testid="install-app" onClick={() => void promptInstall()}>
+        <span aria-hidden>⤓</span>
+        Install app
+      </button>
+    );
+  if (state === 'ios-hint')
+    return (
+      <span className="ol-codex-link" data-testid="install-ios-hint" style={{ cursor: 'default' }}>
+        <span aria-hidden>⤓</span>
+        Install: tap Share, then “Add to Home Screen”
+      </span>
+    );
+  return null;
 }
