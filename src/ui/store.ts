@@ -87,6 +87,7 @@ export const useGame = create<GameStore>()((set, get) => {
     buySpell: (i) => apply((s) => G.buySpell(s, HUMAN, i)),
     buyItem: (i) => apply((s) => G.buyItem(s, HUMAN, i)),
     refreshShop: () => apply((s) => G.refreshShop(s, HUMAN)),
+    cheatShop: () => apply((s) => G.cheatShop(s, HUMAN)),
     upgradeShop: () => apply((s) => G.upgradeShop(s, HUMAN)),
     toggleLock: () => apply((s) => G.toggleLock(s, HUMAN)),
 

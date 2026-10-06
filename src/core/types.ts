@@ -537,6 +537,8 @@ export interface GameActions {
   buySpell(offerIdx: number): void;
   buyItem(offerIdx: number): void;
   refreshShop(): void;
+  /** cheat (triple-tap the Mystery Shop title): 2x Dragon Knight + Black King Bar + Aghanim's Scepter */
+  cheatShop(): void;
   upgradeShop(): void;
   toggleLock(): void;
 

@@ -21,7 +21,7 @@ import { HERO_IDS, HERO_KITS, ITEM_IDS, LORD_SPELL_IDS, SPELL_IDS } from '../ids
 import type { Rng } from '../rng.ts';
 import type { GameState, HeroId, ItemId, OwnedHero, PlayerState, SpellId, Stars } from '../types.ts';
 import { addLevels, refreshCostFor, spellCostFor } from './lords.ts';
-import { say, benchCount, boardCount, fail, firstFreeSlot, heroName, pure, withRng, type GS } from './util.ts';
+import { log, say, benchCount, boardCount, fail, firstFreeSlot, heroName, pure, withRng, type GS } from './util.ts';
 
 export function itemCost(id: ItemId): number {
   return ITEMS[id]?.cost ?? 3;
@@ -269,5 +269,20 @@ export const buyHero = pure(buyHeroM);
 export const buySpell = pure(buySpellM);
 export const buyItem = pure(buyItemM);
 export const refreshShop = pure(refreshShopM);
+
+/** Single-player cheat (triple-tap the "Mystery Shop" title): the hero row becomes 2x Dragon Knight and the
+ *  item row Black King Bar + Aghanim's Scepter; other slots in those rows are emptied, spells untouched.
+ *  Works offline and online (the server applies it to the sender's own seat, prep phase only). */
+export function cheatShopM(s: GS, pid: number) {
+  const p = s.players[pid];
+  if (!p || s.phase !== 'prep') return;
+  p.shop.heroOffers = p.shop.heroOffers.map((_, i) => (i < 2 ? 'dragon_knight' : null));
+  if (p.shop.heroOffers.length < 2) p.shop.heroOffers = ['dragon_knight', 'dragon_knight'];
+  const items: (ItemId | null)[] = ['black_king_bar', 'aghanims_scepter'];
+  p.shop.itemOffers = p.shop.itemOffers.map((_, i) => items[i] ?? null);
+  while (p.shop.itemOffers.length < 2) p.shop.itemOffers.push(items[p.shop.itemOffers.length]!);
+  if (p.isHuman) log(s, 'Cheat activated: 2x Dragon Knight, Black King Bar, Aghanim\'s Scepter.');
+}
+export const cheatShop = pure(cheatShopM);
 export const upgradeShop = pure(upgradeShopM);
 export const toggleLock = pure(toggleLockM);

@@ -162,7 +162,7 @@ describe('online actions', () => {
     a.finishBattle();
     expect(sent.length).toBe(8);
     expect(done).toBe(1);
-    expect(ACT_NAMES.length).toBe(19);
+    expect(ACT_NAMES.length).toBe(20);
   });
 
   test('trimArgs drops only trailing undefined', () => {

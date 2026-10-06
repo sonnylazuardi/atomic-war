@@ -3028,3 +3028,19 @@ html[data-perf='saver'] .conn-badge .ol-dot {
   border: 1px solid rgba(201, 164, 92, 0.6);
   pointer-events: none;
 }
+
+.my-title {
+  position: absolute;
+  top: 6px;
+  left: 12px;
+  font-family: var(--font-head, serif);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(243, 225, 176, 0.7);
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+  z-index: 2;
+}
+.msheet-title { user-select: none; -webkit-user-select: none; }

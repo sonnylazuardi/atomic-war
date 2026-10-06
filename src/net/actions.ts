@@ -10,6 +10,7 @@ export const ACT_NAMES = [
   'buySpell',
   'buyItem',
   'refreshShop',
+  'cheatShop',
   'upgradeShop',
   'toggleLock',
   'upgradeHero',

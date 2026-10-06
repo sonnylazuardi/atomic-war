@@ -1,6 +1,7 @@
 // Space: Mystery shop overlay — like the real game: a wide translucent 5-column panel.
 // Row 1 heroes (figures, no cards), row 2 items, row 3 spells; fewer than 5 offers are spread evenly.
 import type { CSSProperties } from 'react';
+import { useRef } from 'react';
 import { HERO_COST, LEVELS_PER_UPGRADE, MAX_HERO_LEVEL } from '../../../core/constants.ts';
 import { refreshCostFor, spellCostFor } from '../../../core/game/lords.ts';
 import { meOf } from '../../me.ts';
@@ -27,6 +28,17 @@ export function MysteryShop({
   readOnly?: boolean;
 }) {
   const live = useGame();
+  // cheat: triple-tap the "Mystery Shop" title within 1.5 s (offline and online, preparation only)
+  const taps = useRef<number[]>([]);
+  const onTitleTap = () => {
+    const now = performance.now();
+    taps.current = [...taps.current.filter((t) => now - t < 1500), now];
+    if (taps.current.length >= 3) {
+      taps.current = [];
+      const st = useGame.getState();
+      if (!readOnly && st.phase === 'prep') st.cheatShop();
+    }
+  };
   // read-only: every action is a no-op so cards can't buy outside preparation
   const g = readOnly
     ? { ...live, buyHero: () => {}, buyItem: () => {}, buySpell: () => {}, refreshShop: () => {}, toggleLock: () => {} }
@@ -166,7 +178,7 @@ export function MysteryShop({
     return (
       <div className={`msheet${readOnly ? ' my-readonly' : ''}`} role="dialog" aria-label="Mystery shop">
         <div className="msheet-head">
-          <span className="msheet-title">
+          <span className="msheet-title" data-testid="shop-title" onClick={onTitleTap}>
             Mystery Shop <Stars n={me.shopLevel} />
           </span>
           <span className="msheet-coins">
@@ -190,6 +202,9 @@ export function MysteryShop({
 
   return (
     <div className={`mystery${readOnly ? ' my-readonly' : ''}`} role="dialog" aria-label="Mystery shop" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="my-title" data-testid="shop-title" onClick={onTitleTap}>
+        Mystery Shop
+      </div>
       {readOnly && (
         <div className="my-preview" data-testid="shop-preview">
           Preview — plan your next buys · buying opens in preparation
