@@ -124,6 +124,25 @@ export function rollShop(s: GameState, p: PlayerState) {
   });
 }
 
+/** Locked shop at the start of a new round: keep the offers the player didn't buy (same positions)
+ *  and fill every emptied slot (null = bought) with a fresh roll — heroes, spells and items. */
+export function refillShop(s: GameState, p: PlayerState) {
+  withRng(s, (rng) => {
+    const fill = <T,>(offers: (T | null)[], count: number, roll: (n: number, exclude: (T | null)[]) => T[]) => {
+      while (offers.length < count) offers.push(null);
+      const empty = offers.reduce<number[]>((acc, o, i) => (o === null ? [...acc, i] : acc), []);
+      if (!empty.length) return offers;
+      const fresh = roll(empty.length, offers);
+      empty.forEach((i, k) => (offers[i] = fresh[k] ?? null));
+      return offers;
+    };
+    const n = offersForShopLevel(p.shopLevel);
+    p.shop.heroOffers = fill(p.shop.heroOffers, HERO_OFFERS, (k, ex) => rollHeroes(rng, p.shopLevel, k, ex));
+    p.shop.spellOffers = fill(p.shop.spellOffers, n, (k, ex) => rollSpells(rng, p.shopLevel, k, ex));
+    p.shop.itemOffers = fill(p.shop.itemOffers, n, (k, ex) => rollItems(rng, p.shopLevel, k, ex));
+  });
+}
+
 /** Append offers for the slots gained by going from shop level `from` to `to`. */
 export function rollExtraOffers(s: GameState, p: PlayerState, from: number, to: number) {
   const extra = offersForShopLevel(to) - offersForShopLevel(from);

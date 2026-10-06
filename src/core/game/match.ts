@@ -23,7 +23,7 @@ import type {
 } from '../types.ts';
 import { botPickLord, botPrepM } from './bots.ts';
 import { applyLordPick, heroModsFor, resolveBloodrage, lordIncomeBonus, lordSummon, onLeavePrep, onRoundStart, teamModsFor } from './lords.ts';
-import { emptyShop, rollShop } from './shop.ts';
+import { emptyShop, rollShop, refillShop } from './shop.ts';
 import { fail, fighters, log, pure, withRng, type GS, type PendingGains } from './util.ts';
 
 export const BOT_NAMES = [
@@ -429,8 +429,11 @@ export function nextRoundM(s: GS) {
     if (!p.alive) continue;
     p.coins = incomeForRound(s.round) + streakBonus(p.streak) + lordIncomeBonus(p);
     onRoundStart(s, p);
-    if (p.shop.locked) p.shop.locked = false;
-    else rollShop(s, p);
+    if (p.shop.locked) {
+      // locked: keep the unbought offers, refill the slots bought last round, then unlock
+      refillShop(s, p);
+      p.shop.locked = false;
+    } else rollShop(s, p);
   }
   s.phase = 'prep';
   log(s, `Round ${s.round}: prepare for battle!`);

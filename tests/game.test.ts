@@ -201,6 +201,30 @@ describe('shop & economy', () => {
     expect(s.players[0]!.shop.locked).toBe(false);
     expect(s.players[0]!.coins).toBe(incomeForRound(2));
   });
+
+  test('locked shop refills the slots bought last round, keeps the rest', () => {
+    let s = withCoins(prepGame(9, 'axe_lord'), 30);
+    s = G.buyHero(s, 0, 1); // empty hero slot 1
+    s = G.buySpell(s, 0, 0); // empty spell slot 0
+    s = G.buyItem(s, 0, 0); // empty item slot 0
+    s = G.toggleLock(s, 0);
+    const before = structuredClone(s.players[0]!.shop);
+    expect(before.heroOffers[1]).toBeNull();
+    expect(before.spellOffers[0]).toBeNull();
+    expect(before.itemOffers[0]).toBeNull();
+    s = G.nextRound(G.finishBattle(G.readyForBattle(s)));
+    const after = s.players[0]!.shop;
+    // bought slots are refilled ...
+    expect(after.heroOffers[1]).not.toBeNull();
+    expect(after.spellOffers[0]).not.toBeNull();
+    expect(after.itemOffers[0]).not.toBeNull();
+    // ... unbought offers stay exactly where they were
+    before.heroOffers.forEach((o, i) => o !== null && expect(after.heroOffers[i]).toBe(o));
+    before.spellOffers.forEach((o, i) => o !== null && expect(after.spellOffers[i]).toBe(o));
+    before.itemOffers.forEach((o, i) => o !== null && expect(after.itemOffers[i]).toBe(o));
+    expect(after.heroOffers.every((o) => o !== null)).toBe(true);
+    expect(after.locked).toBe(false);
+  });
 });
 
 describe('tavern ★ odds', () => {
