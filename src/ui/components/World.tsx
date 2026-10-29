@@ -71,6 +71,10 @@ export const FULL_VIEWBOX: WorldViewBox = { x: 0, y: 0, w: ARENA_W, h: ARENA_H }
 /** portrait phones: frames the floor where units stand (lanes x 290..710, feet y 130..470) incl. the
  *  top team's sprites, HP bars and name plates (~110 above the feet). */
 export const MOBILE_VIEWBOX: WorldViewBox = { x: 180, y: 12, w: 640, h: 520 };
+/** portrait phones in battle: units roam the whole floor (feet x ~90..690 measured, y 130..550, or 50..470
+ *  mirrored when the human visits) and the top team's sprites + HP bars stand ~110 above their feet, so
+ *  the battle frames the full floor height instead of the prep close-up. */
+export const MOBILE_BATTLE_VIEWBOX: WorldViewBox = { x: 110, y: -40, w: 780, h: 660 };
 
 // ---------------------------------------------------------------- timings (real seconds)
 const TP_DUR = 0.9; // teleport fx length

@@ -1,8 +1,10 @@
-// Mobile: sticky hint/action bar for tap-to-assign (no drag-and-drop on touch screens).
+// Mobile: sticky hint/action bar for tap-to-assign and equipped-slot actions (no drag / right-click on touch).
 import { SELL_ITEM, SELL_SPELL } from '../../../core/constants.ts';
 import { meOf } from '../../me.ts';
 import { useGame } from '../../store.ts';
-import { itemDef, spellDef } from '../defs.ts';
+import { heroDef, itemDef, spellDef } from '../defs.ts';
+import { confirmInnateLoss, innate } from './actions.ts';
+import { sellPayload } from './SellZone.tsx';
 import { useUi } from '../uiState.ts';
 
 export function MobileBar() {
@@ -12,6 +14,7 @@ export function MobileBar() {
   if (g.phase !== 'prep') return null;
   const cancel = () => {
     ui.setPending(null);
+    ui.setSlotPick(null);
     ui.setLordTargeting(false);
   };
   if (ui.lordTargeting) {
@@ -20,6 +23,43 @@ export function MobileBar() {
         <span>Tap one of your heroes for the lord ability</span>
         <button className="btn sm" onClick={cancel}>
           Cancel
+        </button>
+      </div>
+    );
+  }
+  const sp = ui.slotPick;
+  const sh = sp ? me.heroes.find((h) => h.uid === sp.uid) : undefined;
+  const sid = sp && sh ? (sp.kind === 'spell' ? sh.spells[sp.idx] : sh.items[sp.idx]) : null;
+  if (sp && sh && sid) {
+    const d = sp.kind === 'spell' ? spellDef(sid as never) : itemDef(sid as never);
+    const lost = sp.kind === 'spell' && innate(sh, sid as never);
+    const unequip = () => {
+      if (sp.kind === 'spell') {
+        if (!confirmInnateLoss(sh, sp.idx, 'remove')) return;
+        g.unassignSpell(sh.uid, sp.idx);
+      } else g.unequipItem(sh.uid, sp.idx);
+      ui.setSlotPick(null);
+    };
+    const sell = () => {
+      sellPayload(sp.kind === 'spell' ? { kind: 'spellSlot', uid: sh.uid, slot: sp.idx } : { kind: 'itemSlot', uid: sh.uid, slot: sp.idx });
+      ui.setSlotPick(null);
+    };
+    return (
+      <div className="mbar active" data-testid="slot-bar">
+        <span className="mbar-glyph">{d.glyph}</span>
+        <span>
+          <b>{d.name}</b> on {heroDef(sh.heroId).name}
+        </span>
+        <button className="btn sm" data-testid="slot-unequip" onClick={unequip}>
+          {lost ? 'Remove' : sp.kind === 'spell' ? 'Unassign' : 'Unequip'}
+        </button>
+        {!lost && (
+          <button className="btn sm btn-danger" data-testid="slot-sell" onClick={sell}>
+            Sell +${sp.kind === 'spell' ? SELL_SPELL : SELL_ITEM}
+          </button>
+        )}
+        <button className="btn sm" onClick={cancel}>
+          ✕
         </button>
       </div>
     );

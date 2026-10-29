@@ -18,7 +18,7 @@ import { TopCenter } from '../components/hud/TopCenter.tsx';
 import { UnitCard } from '../components/hud/UnitCard.tsx';
 import { hideTip } from '../components/Tooltip.tsx';
 import { useUi } from '../components/uiState.ts';
-import { World } from '../components/World.tsx';
+import { MOBILE_BATTLE_VIEWBOX, World } from '../components/World.tsx';
 import { selfIdOf } from '../me.ts';
 import { useGame } from '../store.ts';
 import { GameOver } from './GameOver.tsx';
@@ -97,9 +97,10 @@ function SpectateBar() {
   );
 }
 
-/** Mobile portrait: World shows the whole arena (letterboxed) instead of the desktop slice-fit.
- *  Passed via spread so it typechecks before and after World adds the props / MOBILE_VIEWBOX. */
-const MOBILE_WORLD = { viewBox: { x: 200, y: 70, w: 600, h: 520 }, fit: 'meet' as const };
+/** Mobile portrait: World letterboxes (meet) instead of the desktop slice-fit. Prep is a close-up of the
+ *  human's courtyard; battle widens to the whole floor so both teams (incl. the enemy back row) stay in view. */
+const MOBILE_PREP_WORLD = { viewBox: { x: 200, y: 70, w: 600, h: 520 }, fit: 'meet' as const };
+const MOBILE_BATTLE_WORLD = { viewBox: MOBILE_BATTLE_VIEWBOX, fit: 'meet' as const };
 
 const isTyping = (t: EventTarget | null) => {
   const el = t as HTMLElement | null;
@@ -138,6 +139,7 @@ export function Play() {
     else {
       setShopOpen(false);
       useUi.getState().setPending(null);
+      useUi.getState().setSlotPick(null);
       useUi.getState().setLordTargeting(false);
       hideTip();
     }
@@ -239,8 +241,9 @@ export function Play() {
         const ui = useUi.getState();
         hideTip();
         if (shopRef.current) setShopOpen(false);
-        else if (ui.pending || ui.lordTargeting) {
+        else if (ui.pending || ui.slotPick || ui.lordTargeting) {
           ui.setPending(null);
+          ui.setSlotPick(null);
           ui.setLordTargeting(false);
         } else ui.select(null);
       }
@@ -275,7 +278,7 @@ export function Play() {
       onDropOnSlot={onDropOnSlot}
       onBattleDone={onBattleDone}
       {...{ onUpgradeHero, onHeroDragStart, onHeroDragEnd }}
-      {...(mobile ? MOBILE_WORLD : {})}
+      {...(mobile ? (battle ? MOBILE_BATTLE_WORLD : MOBILE_PREP_WORLD) : {})}
     />
   );
   const onToggleShop = () => setShopOpen((o) => !o);

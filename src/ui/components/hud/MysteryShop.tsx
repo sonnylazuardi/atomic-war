@@ -2,7 +2,7 @@
 // Row 1 heroes (figures, no cards), row 2 items, row 3 spells; fewer than 5 offers are spread evenly.
 import type { CSSProperties } from 'react';
 import { useRef } from 'react';
-import { HERO_COST, LEVELS_PER_UPGRADE, MAX_HERO_LEVEL } from '../../../core/constants.ts';
+import { HERO_COST, LEVELS_PER_UPGRADE, MAX_HERO_LEVEL, MAX_SHOP_LEVEL, shopUpgradeCost } from '../../../core/constants.ts';
 import { refreshCostFor, spellCostFor } from '../../../core/game/lords.ts';
 import { meOf } from '../../me.ts';
 import { useGame } from '../../store.ts';
@@ -10,6 +10,7 @@ import { CLASS_INFO, heroDef, itemDef, spellDef, starColor } from '../defs.ts';
 import { HeroPortrait } from '../HeroPortrait.tsx';
 import { HeroTip, ItemTip, SpellTip, tip } from '../Tooltip.tsx';
 import { safe } from './actions.ts';
+import { ReadyButton } from './ReadyButton.tsx';
 import { Stars } from './Stars.tsx';
 
 const COLS = 5;
@@ -41,7 +42,7 @@ export function MysteryShop({
   };
   // read-only: every action is a no-op so cards can't buy outside preparation
   const g = readOnly
-    ? { ...live, buyHero: () => {}, buyItem: () => {}, buySpell: () => {}, refreshShop: () => {}, toggleLock: () => {} }
+    ? { ...live, buyHero: () => {}, buyItem: () => {}, buySpell: () => {}, refreshShop: () => {}, toggleLock: () => {}, upgradeShop: () => {} }
     : live;
   const me = meOf(g);
   const spellCost = safe(() => spellCostFor(me), 3);
@@ -196,6 +197,7 @@ export function MysteryShop({
           <div className="msheet-grid">{spellCells}</div>
           <p className="msheet-hint">{readOnly ? 'Preview — buying opens in preparation' : 'Tap to buy · press and hold for details'}</p>
         </div>
+        <MobileFoot me={me} readOnly={readOnly} onUpgrade={() => g.upgradeShop()} />
       </div>
     );
   }
@@ -216,6 +218,29 @@ export function MysteryShop({
         {spellCells}
       </div>
       {side}
+    </div>
+  );
+}
+
+/** mobile sheet footer: the sheet covers the Dock and the top bar, so Tavern upgrade + Ready live here too */
+function MobileFoot({ me, readOnly, onUpgrade }: { me: ReturnType<typeof meOf>; readOnly: boolean; onUpgrade: () => void }) {
+  const maxed = me.shopLevel >= MAX_SHOP_LEVEL;
+  const cost = shopUpgradeCost(me.shopLevel);
+  return (
+    <div className="msheet-foot">
+      <button
+        className={`btn msheet-tavern ${!maxed && me.coins < cost ? 'poor' : ''}`}
+        data-testid="sheet-upgrade-shop"
+        disabled={readOnly || maxed}
+        onClick={onUpgrade}
+      >
+        <span className="msheet-tavern-glyph">🍺</span>
+        <span className="msheet-tavern-txt">
+          Tavern <Stars n={me.shopLevel} />
+        </span>
+        <b>{maxed ? 'MAX' : `⬆ $${cost}`}</b>
+      </button>
+      <ReadyButton />
     </div>
   );
 }

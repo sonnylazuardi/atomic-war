@@ -12,6 +12,20 @@ import { AghGlyph, HeroTip, ItemTip, SpellTip, tip } from '../Tooltip.tsx';
 import { useUi, type RosterTab } from '../uiState.ts';
 import { LUNA_PER_USE } from './lordStatus.ts';
 import { assignSpellSafe, clickHero, confirmInnateLoss, dropOnHero, innate, safe } from './actions.ts';
+import { useLayoutMode } from './layout.ts';
+
+/** mobile: tapping a filled slot (nothing pending) picks it for the action bar; returns whether it did */
+function useSlotPick(hero: OwnedHero, kind: 'spell' | 'item', idx: number, filled: boolean, prep: boolean) {
+  const mobile = useLayoutMode() === 'mobile';
+  const picked = useUi((s) => s.slotPick?.uid === hero.uid && s.slotPick.kind === kind && s.slotPick.idx === idx);
+  const toggle = () => {
+    if (!mobile || !prep || !filled) return false;
+    useUi.getState().setSlotPick(picked ? null : { uid: hero.uid, kind, idx });
+    useUi.getState().select(hero.uid);
+    return true;
+  };
+  return { picked, toggle };
+}
 
 export function SpellSlot({ hero, idx, id, prep }: { hero: OwnedHero; idx: number; id: SpellId | null; prep: boolean }) {
   const g = useGame();
@@ -28,17 +42,18 @@ export function SpellSlot({ hero, idx, id, prep }: { hero: OwnedHero; idx: numbe
   const s = id ? spellDef(id) : null;
   const agh = !!s?.aghanim && hero.items.includes('aghanims_scepter');
   const pendingHere = prep && ui.pending?.kind === 'spell';
+  const pick = useSlotPick(hero, 'spell', idx, !!id, prep);
   // warn while an inventory spell hovers an innate slot: dropping destroys the kit spell
   const warn = s && isInnate && (drop.over || pendingHere) ? `replaces ${s.name} (innate, lost)` : null;
   return (
     <div
-      className={`rs spell ${agh ? 'agh' : ''} ${isInnate ? 'innate' : ''} ${s?.ultimate ? 'ult' : ''} ${s ? 'filled' : 'empty'} ${drop.over ? 'drop-over' : ''} ${pendingHere ? 'targetable' : ''} ${warn && drop.over ? 'warn' : ''}`}
+      className={`rs spell ${agh ? 'agh' : ''} ${isInnate ? 'innate' : ''} ${s?.ultimate ? 'ult' : ''} ${s ? 'filled' : 'empty'} ${drop.over ? 'drop-over' : ''} ${pendingHere ? 'targetable' : ''} ${warn && drop.over ? 'warn' : ''} ${pick.picked ? 'picked' : ''}`}
       style={{ ...(s ? { ['--star' as string]: starColor(s.stars ?? 1) } : {}), ['--kit-c' as string]: heroDef(hero.heroId).palette.primary }}
       onClick={(e) => {
         e.stopPropagation();
         if (pendingHere && ui.pending) {
           if (assignSpellSafe(hero, idx, ui.pending.idx)) ui.setPending(null);
-        } else clickHero(hero.uid);
+        } else if (!pick.toggle()) clickHero(hero.uid);
       }}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -84,16 +99,17 @@ export function ItemSlot({ hero, idx, id, prep }: { hero: OwnedHero; idx: number
   );
   const it = id ? itemDef(id) : null;
   const pendingHere = prep && ui.pending?.kind === 'item';
+  const pick = useSlotPick(hero, 'item', idx, !!id, prep);
   return (
     <div
-      className={`rs item ${it ? 'filled' : 'empty'} ${drop.over ? 'drop-over' : ''} ${pendingHere ? 'targetable' : ''}`}
+      className={`rs item ${it ? 'filled' : 'empty'} ${drop.over ? 'drop-over' : ''} ${pendingHere ? 'targetable' : ''} ${pick.picked ? 'picked' : ''}`}
       style={it ? { ['--star' as string]: starColor(it.tier) } : undefined}
       onClick={(e) => {
         e.stopPropagation();
         if (pendingHere && ui.pending) {
           g.equipItem(hero.uid, idx, ui.pending.idx);
           ui.setPending(null);
-        } else clickHero(hero.uid);
+        } else if (!pick.toggle()) clickHero(hero.uid);
       }}
       onContextMenu={(e) => {
         e.preventDefault();
