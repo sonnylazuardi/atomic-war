@@ -2565,6 +2565,11 @@ body {
   bottom: auto;
   width: calc(100% - 24px);
 }
+/* battle: the enemy row stands at the top of the arena, keep toasts off it (bottom of the screen) */
+.mstage:has(.mplay.phase-battle) .toasts {
+  top: auto;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+}
 .mstage .toast {
   max-width: 100%;
   text-align: center;
