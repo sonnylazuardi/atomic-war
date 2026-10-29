@@ -4,7 +4,7 @@ import { create } from 'zustand';
 export type PendingInv = { kind: 'spell' | 'item'; idx: number } | null;
 export type RosterTab = 'items' | 'skills';
 /** mobile: a filled hero slot tapped for its actions (unequip / sell), since touch has no right-click or drag */
-export type SlotPick = { uid: string; kind: 'spell' | 'item'; idx: number } | null;
+export type SlotPick = { uid: string; kind: 'spell' | 'item'; idx: number; /** Move tapped: next hero/slot tap is the target */ moving?: boolean } | null;
 
 const TAB_KEY = 'aw.rosterTab';
 function loadTab(): RosterTab {

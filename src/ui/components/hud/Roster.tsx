@@ -11,14 +11,18 @@ import { HeroPortrait, phaseOf } from '../HeroPortrait.tsx';
 import { AghGlyph, HeroTip, ItemTip, SpellTip, tip } from '../Tooltip.tsx';
 import { useUi, type RosterTab } from '../uiState.ts';
 import { LUNA_PER_USE } from './lordStatus.ts';
-import { assignSpellSafe, clickHero, confirmInnateLoss, dropOnHero, innate, safe } from './actions.ts';
+import { assignSpellSafe, clickHero, confirmInnateLoss, dropOnHero, innate, moveSlotTo, safe } from './actions.ts';
 import { useLayoutMode } from './layout.ts';
 
-/** mobile: tapping a filled slot (nothing pending) picks it for the action bar; returns whether it did */
+/** mobile: tapping a filled slot (nothing pending) picks it for the action bar, or drops a Move there;
+ *  returns whether it handled the tap */
 function useSlotPick(hero: OwnedHero, kind: 'spell' | 'item', idx: number, filled: boolean, prep: boolean) {
   const mobile = useLayoutMode() === 'mobile';
   const picked = useUi((s) => s.slotPick?.uid === hero.uid && s.slotPick.kind === kind && s.slotPick.idx === idx);
   const toggle = () => {
+    // Move in progress: this slot is the target (same kind), or its hero is (other kind)
+    const sp = useUi.getState().slotPick;
+    if (sp?.moving) return moveSlotTo(hero.uid, sp.kind === kind ? idx : undefined);
     if (!mobile || !prep || !filled) return false;
     useUi.getState().setSlotPick(picked ? null : { uid: hero.uid, kind, idx });
     useUi.getState().select(hero.uid);

@@ -2283,6 +2283,7 @@ body {
 .mbar .btn.sm {
   flex: none;
   height: 34px;
+  padding: 0 10px;
 }
 /* dock: 3 big tap buttons */
 .mplay .hud-dock {

@@ -54,6 +54,40 @@ export function safe<T>(fn: () => T, fallback: T): T {
   }
 }
 
+/** Mobile Move: take the picked equipped item/spell off its hero and put it on hero `uid` (into `slot`, or
+ *  the first free one). The slot's previous occupant goes back to the inventory. Returns whether it moved. */
+export function moveSlotTo(uid: string, slot?: number): boolean {
+  const ui = useUi.getState();
+  const sp = ui.slotPick;
+  const g = useGame.getState();
+  if (!sp?.moving || g.phase !== 'prep') return false;
+  const p = meOf(g);
+  const src = p.heroes.find((x) => x.uid === sp.uid);
+  const dst = p.heroes.find((x) => x.uid === uid);
+  const id = src && (sp.kind === 'spell' ? src.spells[sp.idx] : src.items[sp.idx]);
+  if (!src || !dst || !id) return false;
+  if (src.uid === dst.uid && (slot === undefined || slot === sp.idx)) {
+    ui.setSlotPick(null); // tapped the source again: nothing to move
+    return true;
+  }
+  if (sp.kind === 'spell') {
+    const to = slot ?? firstSpellSlot(dst);
+    if (to < 0 || !confirmInnateLoss(dst, to, 'replace')) return true;
+    g.unassignSpell(src.uid, sp.idx);
+    const i = meOf(useGame.getState()).spellInventory.lastIndexOf(id as SpellId);
+    if (i >= 0) useGame.getState().assignSpell(dst.uid, to, i);
+  } else {
+    const to = slot ?? firstItemSlot(dst);
+    g.unequipItem(src.uid, sp.idx);
+    const i = meOf(useGame.getState()).itemInventory.lastIndexOf(id as never);
+    if (i >= 0) useGame.getState().equipItem(dst.uid, to, i);
+  }
+  ui.setSlotPick(null);
+  ui.select(dst.uid);
+  sfx.uiClick();
+  return true;
+}
+
 /** Click on a hero (roster row or World sprite). */
 export function clickHero(uid: string | null) {
   const ui = useUi.getState();
@@ -70,6 +104,7 @@ export function clickHero(uid: string | null) {
     ui.select(h.uid);
     return;
   }
+  if (moveSlotTo(h.uid)) return;
   if (g.phase === 'prep' && ui.pending) {
     if (ui.pending.kind === 'spell') assignSpellSafe(h, firstSpellSlot(h), ui.pending.idx);
     else g.equipItem(h.uid, firstItemSlot(h), ui.pending.idx);
