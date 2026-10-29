@@ -3,6 +3,7 @@ import { useNet, watch } from '../../../net/session.ts';
 import { useGame } from '../../store.ts';
 import { lordDef } from '../defs.ts';
 import { LordTip, tip } from '../Tooltip.tsx';
+import { ONLINE_CSS } from '../../screens/online/online.css.ts';
 
 /** Left edge: 8 players, portrait + name + lord + HP. */
 export function PlayerList({ opponent }: { opponent: number | null }) {
@@ -13,8 +14,8 @@ export function PlayerList({ opponent }: { opponent: number | null }) {
   const seat = useNet((s) => (s.inGame ? (s.you?.seat ?? null) : null));
   const watching = useNet((s) => s.watching);
   const selfId = inGame && seat !== null ? seat : viewId;
-  // online: eliminated players (and seatless spectators) can watch anyone's arena
-  const canWatch = inGame && phase !== 'game_over' && (seat === null || players[seat]?.alive === false);
+  // online: anyone can watch another arena (read-only): their board in prep, their fight in battle
+  const canWatch = inGame && phase !== 'game_over';
   const sorted = [...players].sort((a, b) => {
     if (a.alive !== b.alive) return a.alive ? -1 : 1;
     if (a.alive) return b.hp - a.hp || a.id - b.id;
@@ -22,6 +23,7 @@ export function PlayerList({ opponent }: { opponent: number | null }) {
   });
   return (
     <aside className="hud-players">
+      {canWatch && <style>{ONLINE_CSS}</style>}
       {sorted.map((p) => {
         const lord = p.lordId ? lordDef(p.lordId) : null;
         const pct = Math.max(0, Math.min(1, p.hp / (p.maxHp || 100)));
@@ -44,7 +46,7 @@ export function PlayerList({ opponent }: { opponent: number | null }) {
                 }
               : {})}
           >
-            {canWatch && <span className="hp-watch">{watching === p.id ? 'Watching' : p.id === seat ? 'You' : 'Watch'}</span>}
+            {canWatch && <span className="hp-watch">{watching === p.id ? 'Watching' : p.id === seat ? 'You' : '👁 Watch'}</span>}
             <div className="hp-port" style={{ ['--lord-c' as string]: lord?.color ?? '#666' }}>
               <span>{p.alive ? lord?.glyph ?? '?' : '💀'}</span>
               {vs && <i className="hp-vs">⚔</i>}

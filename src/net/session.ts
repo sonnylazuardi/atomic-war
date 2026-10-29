@@ -31,7 +31,7 @@ interface NetState {
   inGame: boolean;
   /** round-trip ms (heartbeat ping/pong median) */
   ping: number | null;
-  /** spectating: the seat whose arena we see (eliminated players); null = our own */
+  /** spectating: the seat whose arena we see (anyone, read-only); null = our own */
   watching: number | null;
   /** unrecoverable: the server speaks a newer protocol -> "Game updated — reload" */
   fatal: 'version' | null;
@@ -236,7 +236,7 @@ export function setReady(ready: boolean) {
   useGame.setState(withReady(plainState(useGame.getState()), ownSeat(), ready) as Partial<GameStore>);
 }
 
-/** spectate seat `pid` (eliminated players only); null = back to our own arena */
+/** spectate seat `pid` (read-only; the server sends alive players home when prep begins); null = our own arena */
 export function watch(pid: number | null) {
   socket?.send({ t: 'watch', pid });
 }

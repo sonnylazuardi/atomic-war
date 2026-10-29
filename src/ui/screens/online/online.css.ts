@@ -119,14 +119,21 @@ export const ONLINE_CSS = `
 .hp-row .hp-watch { position: absolute; right: 6px; top: 3px; font-size: 9.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
   color: var(--gold); opacity: 0; transition: opacity .12s; pointer-events: none; }
 .hp-row.watchable:hover .hp-watch, .hp-row.watched .hp-watch { opacity: 1; }
+/* no hover on touch: always show the Watch hint, as a tag on the card's top edge (clear of the name) */
+.mplay .hp-row.watchable .hp-watch { opacity: 1; top: -7px; right: 8px; padding: 1px 5px; border-radius: 4px; font-size: 8.5px; line-height: 1.2;
+  background: #0b0d12; border: 1px solid var(--gold-deep); }
+.mplay .hp-row.watchable:not(.watched):not(.you) .hp-watch { color: var(--text-dim); border-color: var(--line); }
+.mplay .hud-players { padding-top: 8px; } /* room for the tags (the strip clips vertically) */
+.ol-banner-hint { font: 600 11px var(--font-body); letter-spacing: 0; text-transform: none; color: var(--text-dim); }
 .spec-bar { position: absolute; left: 50%; top: 84px; transform: translateX(-50%); z-index: 31; display: flex; align-items: center; gap: 10px;
   padding: 5px 6px 5px 16px; border-radius: 99px; background: rgba(10,12,18,.88); border: 1px solid var(--gold-deep);
   font: 700 13px var(--font-head); letter-spacing: .08em; color: var(--gold); white-space: nowrap; }
 .spec-bar.hint { padding: 7px 16px; color: var(--text-dim); border-color: var(--line); font-family: var(--font-body); letter-spacing: 0; }
 .spec-bar .btn { height: 26px; font-size: 12px; }
-.mplay .spec-bar { position: fixed; top: calc(58px + env(safe-area-inset-top)); max-width: calc(100vw - 24px); }
+/* mobile: in the scroll column right under the arena (never over the enemy row) */
+.mplay .spec-bar { position: static; transform: none; align-self: center; max-width: 100%; white-space: normal; }
 .ol-banner.low { top: 128px; }
-.mplay .ol-banner.low { top: calc(100px + env(safe-area-inset-top)); }
+
 .ol-fatal { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: rgba(5,6,10,.78); padding: 16px; }
 .ol-fatal .panel { width: min(380px, 100%); text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; padding: 22px; }
 .ol-fatal h3 { font-family: var(--font-head); color: var(--gold); letter-spacing: .08em; font-size: 20px; }
@@ -135,7 +142,7 @@ export const ONLINE_CSS = `
 .ol-banner { position: absolute; left: 50%; top: 92px; transform: translateX(-50%); z-index: 30; padding: 8px 18px; border-radius: 99px;
   background: rgba(10,12,18,.85); border: 1px solid var(--bronze); color: var(--bronze-hi); font: 700 13px var(--font-head);
   letter-spacing: .1em; text-transform: uppercase; pointer-events: none; white-space: nowrap; }
-.mplay .ol-banner { position: fixed; top: calc(60px + env(safe-area-inset-top)); }
+.mplay .ol-banner { position: static; transform: none; align-self: center; max-width: 100%; white-space: normal; text-align: center; }
 .sm-waiting { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 5; padding: 10px 22px; border-radius: 99px;
   background: rgba(10,6,16,.8); border: 1px solid rgba(255,255,255,.2); font: 700 15px var(--font-head); letter-spacing: .1em; color: #f4efe6; }
 @media (max-width: 760px) {

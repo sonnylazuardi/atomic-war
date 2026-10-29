@@ -33,7 +33,7 @@ function OnlineWait() {
   return (
     <div className={`ol-banner${useNet.getState().watching !== null ? ' low' : ''}`} data-testid="waiting-others">
       <style>{ONLINE_CSS}</style>
-      Waiting for other battles…
+      Waiting for other battles…{useNet.getState().watching === null && <small className="ol-banner-hint"> · pick a player to watch their battle</small>}
     </div>
   );
 }
@@ -80,10 +80,10 @@ function SpectateBar() {
     return (
       <div className="spec-bar" data-testid="spectating">
         <style>{ONLINE_CSS}</style>
-        Spectating {name ?? `Player ${watching + 1}`}
+        Watching {name ?? `Player ${watching + 1}`}
         {seat !== null && (
           <button className="btn btn-ghost" data-testid="spectate-back" onClick={() => watch(null)}>
-            Back
+            {dead ? 'Back' : 'My arena'}
           </button>
         )}
       </div>
@@ -289,6 +289,8 @@ export function Play() {
         <TopCenter timer={timer} enemy={enemyName} />
         <div className="m-world">{world}</div>
         <div className="m-scroll">
+          <SpectateBar />
+          <OnlineWait />
           <PlayerList opponent={oppId} />
           {canShop && <MobileBar />}
           {canShop && <Dock shopOpen={shopOpen} onToggleShop={onToggleShop} />}
@@ -298,10 +300,8 @@ export function Play() {
         </div>
         {canShop && <SellZone />}
         {canShop && shopOpen && <MysteryShop mobile readOnly={!prep} onClose={() => setShopOpen(false)} />}
-        <SpectateBar />
         {phase === 'results' && <ResultToast left={timer} />}
         {phase === 'game_over' && <GameOver />}
-        <OnlineWait />
       </div>
     );
   }

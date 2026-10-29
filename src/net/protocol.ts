@@ -95,7 +95,7 @@ export type ClientMsg =
   /** prep phase: mark yourself ready (or not). The battle starts when every connected, alive,
    *  non-autopilot human is ready — or when the prep deadline passes. */
   | { t: 'ready'; ready: boolean }
-  /** spectate another player's arena (eliminated players only); null = back to your own seat */
+  /** spectate another player's arena (read-only; alive players are sent home at each prep); null = back to your own seat */
   | { t: 'watch'; pid: number | null }
   | { t: 'ping'; at: number };
 
